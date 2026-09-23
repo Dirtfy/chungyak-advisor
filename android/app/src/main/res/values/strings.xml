@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">청약 레이더</string>
+    <string name="notif_channel_new">신규 청약 공고</string>
+    <string name="notif_channel_new_desc">수도권 일반공급 신규 공고 알림</string>
+</resources>

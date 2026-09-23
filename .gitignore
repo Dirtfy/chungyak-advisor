@@ -1,0 +1,13 @@
+# Leader control/scratch files (not part of the product)
+CLAUDE.md
+mission.txt
+prompt.txt
+report.txt
+leader.log
+handoff.txt
+.claude/
+
+# Containerized Gradle cache + local build artifacts
+.gradle-home/
+android/build.log
+dist/
