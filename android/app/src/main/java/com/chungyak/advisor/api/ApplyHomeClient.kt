@@ -15,6 +15,9 @@ sealed class FetchResult {
     data class Error(val message: String) : FetchResult()
 }
 
+/** 주택형별 분양가(만원) 범위. 0 = 미확인. */
+data class PriceRange(val minManwon: Int, val maxManwon: Int)
+
 /**
  * Minimal client for 한국부동산원 청약홈 "분양정보 조회 서비스" on data.go.kr
  * (odcloud stage 37000). Only the APT general-supply endpoint is used for the
@@ -28,6 +31,9 @@ object ApplyHomeClient {
 
     private const val BASE = "https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1"
     private const val ENDPOINT = "getAPTLttotPblancDetail"
+    // 주택형별 상세(면적·세대수·분양가). 분양가는 LTTOT_TOP_AMOUNT(만원)에 있고
+    // 목록 엔드포인트(getAPTLttotPblancDetail)에는 없다 → 공고별 2차 호출로 결합.
+    private const val MDL_ENDPOINT = "getAPTLttotPblancMdl"
     private const val PER_PAGE = 100
     private const val MAX_PAGES = 10
 
@@ -66,18 +72,58 @@ object ApplyHomeClient {
         return FetchResult.Ok(out)
     }
 
+    /**
+     * Fetch the 분양가 range for one 공고 via the 주택형별 상세 endpoint. Reads
+     * `LTTOT_TOP_AMOUNT` (만원) across all 주택형 and returns the min/max. Returns
+     * null on error/no-data so the worker can leave the price unset (0).
+     *
+     * Fields confirmed against the 청약홈 OAS and a working reference collector:
+     *   MODEL_NO, HOUSE_TY, SUPLY_AR, SUPLY_HSHLDCO, LTTOT_TOP_AMOUNT.
+     */
+    fun fetchPrice(serviceKey: String, houseManageNo: String, pblancNo: String): PriceRange? {
+        if (serviceKey.isBlank() || houseManageNo.isBlank() || pblancNo.isBlank()) return null
+        val h = URLEncoder.encode("cond[HOUSE_MANAGE_NO::EQ]", "UTF-8")
+        val p = URLEncoder.encode("cond[PBLANC_NO::EQ]", "UTF-8")
+        val prices = ArrayList<Int>()
+        try {
+            var page = 1
+            while (page <= 3) {
+                val url = "$BASE/$MDL_ENDPOINT?page=$page&perPage=$PER_PAGE&returnType=JSON" +
+                    "&$h=${URLEncoder.encode(houseManageNo, "UTF-8")}" +
+                    "&$p=${URLEncoder.encode(pblancNo, "UTF-8")}" +
+                    "&serviceKey=${keyParam(serviceKey)}"
+                val json = getJson(url) ?: break
+                if (!json.has("data")) break
+                val data = json.getJSONArray("data")
+                for (i in 0 until data.length()) {
+                    manwon(data.getJSONObject(i).optString("LTTOT_TOP_AMOUNT"))?.let { prices.add(it) }
+                }
+                if (data.length() < PER_PAGE) break
+                page++
+            }
+        } catch (e: Exception) {
+            return null
+        }
+        return if (prices.isEmpty()) null else PriceRange(prices.min(), prices.max())
+    }
+
     private fun request(serviceKey: String, page: Int, since: String): JSONObject? {
-        // Portal shows both a Decoding (raw) and an Encoding (percent-encoded)
-        // key; accept either by only encoding when it is not already encoded.
-        val keyParam =
-            if (Regex("%[0-9A-Fa-f]{2}").containsMatchIn(serviceKey)) serviceKey
-            else URLEncoder.encode(serviceKey, "UTF-8")
         val cond = URLEncoder.encode("cond[RCRIT_PBLANC_DE::GTE]", "UTF-8")
-        val url = URL(
-            "$BASE/$ENDPOINT?page=$page&perPage=$PER_PAGE&returnType=JSON" +
-                "&$cond=$since&serviceKey=$keyParam"
-        )
-        val conn = (url.openConnection() as HttpURLConnection).apply {
+        val url = "$BASE/$ENDPOINT?page=$page&perPage=$PER_PAGE&returnType=JSON" +
+            "&$cond=$since&serviceKey=${keyParam(serviceKey)}"
+        return getJson(url)
+    }
+
+    /**
+     * Portal shows both a Decoding (raw) and an Encoding (percent-encoded) key;
+     * accept either by only encoding when it is not already encoded.
+     */
+    private fun keyParam(serviceKey: String): String =
+        if (Regex("%[0-9A-Fa-f]{2}").containsMatchIn(serviceKey)) serviceKey
+        else URLEncoder.encode(serviceKey, "UTF-8")
+
+    private fun getJson(urlStr: String): JSONObject? {
+        val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15_000
             readTimeout = 20_000
@@ -97,6 +143,12 @@ object ApplyHomeClient {
         } finally {
             conn.disconnect()
         }
+    }
+
+    /** "85,600" / "85600" → 85600 (만원). "공고문 참조" 등 숫자 없으면 null. */
+    private fun manwon(v: String): Int? {
+        val digits = v.filter { it.isDigit() }
+        return if (digits.isEmpty()) null else digits.toIntOrNull()
     }
 
     private fun matchesRegion(row: JSONObject, regions: Set<String>): Boolean {

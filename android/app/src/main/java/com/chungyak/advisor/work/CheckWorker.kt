@@ -51,7 +51,15 @@ class CheckWorker(
             is FetchResult.Ok -> {
                 val dao = AppDatabase.get(applicationContext).noticeDao()
                 val existing = dao.allIds().toHashSet()
-                val fresh = result.notices.filter { it.id !in existing }
+                // 분양가는 목록에 없어 신규 공고에 한해 주택형별 상세를 2차 호출로 결합.
+                val fresh = result.notices.filter { it.id !in existing }.map { n ->
+                    val price = ApplyHomeClient.fetchPrice(
+                        settings.serviceKey, n.houseManageNo, n.pblancNo,
+                    )
+                    if (price != null) {
+                        n.copy(priceMinManwon = price.minManwon, priceMaxManwon = price.maxManwon)
+                    } else n
+                }
                 if (fresh.isNotEmpty()) {
                     dao.insertAll(fresh)
                     Notifier.notifyNew(applicationContext, fresh)

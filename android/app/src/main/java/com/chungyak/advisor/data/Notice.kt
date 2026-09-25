@@ -26,6 +26,9 @@ data class Notice(
     val adjustmentArea: Boolean,  // 조정대상지역 여부
     val url: String,             // 청약홈 공고 상세 URL
     val homepage: String,
+    // 분양가(주택형별 최고분양가 LTTOT_TOP_AMOUNT, 만원)의 최소/최대. 0 = 미확인.
+    val priceMinManwon: Int = 0,
+    val priceMaxManwon: Int = 0,
     val firstSeen: Long,         // epoch millis this row was first collected
     val notified: Boolean,       // whether a local notification was already posted
 )

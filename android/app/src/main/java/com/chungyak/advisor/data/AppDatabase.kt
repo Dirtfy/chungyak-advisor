@@ -5,7 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Notice::class], version = 1, exportSchema = false)
+// v2: added 분양가 columns (priceMinManwon/priceMaxManwon) to Notice.
+@Database(entities = [Notice::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun noticeDao(): NoticeDao
 
@@ -18,7 +19,11 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "chungyak.db",
-                ).build().also { instance = it }
+                )
+                    // Collected 공고 are re-fetchable from the API, so a schema
+                    // bump can safely drop and rebuild rather than migrate.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

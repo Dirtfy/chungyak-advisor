@@ -192,6 +192,14 @@ private fun NoticeRow(n: Notice) {
                 "${n.totalUnits}세대 · $schedule · 발표 ${n.resultDate}",
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (n.priceMaxManwon > 0) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "분양가 ${priceText(n.priceMinManwon, n.priceMaxManwon)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
             if (n.speculationArea || n.adjustmentArea) {
                 Spacer(Modifier.height(2.dp))
                 val tags = buildList {
@@ -202,4 +210,14 @@ private fun NoticeRow(n: Notice) {
             }
         }
     }
+}
+
+/** 만원 단위 최저~최고 분양가를 "N.N억" 범위 문자열로. 동일하면 한 값만. */
+private fun priceText(minManwon: Int, maxManwon: Int): String {
+    fun fmt(manwon: Int): String {
+        val eok = manwon / 10000.0
+        return if (eok >= 1) "%.1f억".format(eok) else "${manwon}만원"
+    }
+    return if (minManwon in 1 until maxManwon) "${fmt(minManwon)}~${fmt(maxManwon)}"
+    else fmt(maxManwon)
 }
