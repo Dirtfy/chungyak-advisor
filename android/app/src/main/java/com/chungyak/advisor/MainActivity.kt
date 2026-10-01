@@ -4,8 +4,10 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -21,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,12 +40,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
 import com.chungyak.advisor.ui.NoticeViewModel
+import com.chungyak.advisor.ui.PriceFormat
 import com.chungyak.advisor.ui.theme.ChungyakTheme
 
 class MainActivity : ComponentActivity() {
@@ -69,6 +78,14 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     val notices by vm.notices.collectAsState()
     val status by vm.status.collectAsState()
     var showSettings by remember { mutableStateOf(!vm.hasKey) }
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    val selected = notices.firstOrNull { it.id == selectedId }
+
+    if (selected != null) {
+        BackHandler { selectedId = null }
+        NoticeDetailScreen(selected, vm, onBack = { selectedId = null })
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -112,7 +129,7 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
                 )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(notices, key = { it.id }) { NoticeRow(it) }
+                    items(notices, key = { it.id }) { NoticeRow(it) { selectedId = it.id } }
                 }
             }
         }
@@ -176,9 +193,9 @@ private fun SettingsCard(vm: NoticeViewModel, onSaved: () -> Unit) {
 }
 
 @Composable
-private fun NoticeRow(n: Notice) {
+private fun NoticeRow(n: Notice, onClick: () -> Unit) {
     Card(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(),
     ) {
         Column(Modifier.padding(14.dp)) {
@@ -192,14 +209,12 @@ private fun NoticeRow(n: Notice) {
                 "${n.totalUnits}세대 · $schedule · 발표 ${n.resultDate}",
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (n.priceMaxManwon > 0) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "분양가 ${priceText(n.priceMinManwon, n.priceMaxManwon)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "분양가 ${priceSummary(n)}",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+            )
             if (n.speculationArea || n.adjustmentArea) {
                 Spacer(Modifier.height(2.dp))
                 val tags = buildList {
@@ -212,12 +227,125 @@ private fun NoticeRow(n: Notice) {
     }
 }
 
-/** 만원 단위 최저~최고 분양가를 "N.N억" 범위 문자열로. 동일하면 한 값만. */
-private fun priceText(minManwon: Int, maxManwon: Int): String {
-    fun fmt(manwon: Int): String {
-        val eok = manwon / 10000.0
-        return if (eok >= 1) "%.1f억".format(eok) else "${manwon}만원"
+/** 목록용 분양가 범위. 아직 상세를 못 받았으면 "확인 중", 받았는데 값이 없으면 "정보 없음". */
+private fun priceSummary(n: Notice): String =
+    if (n.modelsFetchedAt == 0L && n.priceMaxManwon <= 0) "확인 중"
+    else PriceFormat.range(n.priceMinManwon, n.priceMaxManwon)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, onBack: () -> Unit) {
+    val models by remember(n.id) { vm.models(n.id) }.collectAsState(initial = emptyList())
+    val uri = LocalUriHandler.current
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(n.name, maxLines = 1) },
+                navigationIcon = { TextButton(onClick = onBack) { Text("〈 목록") } },
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Text("${n.areaName} · ${n.address}", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "${n.totalUnits}세대 · 모집공고 ${n.noticeDate}" +
+                    (if (n.rank1Start.isNotBlank()) " · 1순위 ${n.rank1Start}~${n.rank1End}" else "") +
+                    " · 발표 ${n.resultDate}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Spacer(Modifier.height(12.dp))
+            Text("분양가 ${priceSummary(n)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("주택형별 분양가 (최고가 기준)", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(8.dp))
+                    if (models.isEmpty()) {
+                        Text(
+                            if (n.modelsFetchedAt == 0L) "주택형별 정보를 아직 받지 못했습니다. '지금 확인' 후 다시 열어보세요."
+                            else PriceFormat.NONE,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else {
+                        ModelHeader()
+                        models.forEach { ModelRow(it) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "· 분양가: 청약홈 주택형별 공급금액(분양최고금액). 평당가 = 분양가 ÷ 공급면적(평, 1평=3.3058㎡).\n" +
+                    "· 세대수: 일반공급 기준. 옵션·발코니 확장비 제외 — 정확한 금액은 모집공고문 확인.",
+                style = MaterialTheme.typography.labelSmall,
+            )
+            if (n.url.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = { runCatching { uri.openUri(n.url) } }) { Text("청약홈 공고 열기") }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
     }
-    return if (minManwon in 1 until maxManwon) "${fmt(minManwon)}~${fmt(maxManwon)}"
-    else fmt(maxManwon)
+}
+
+@Composable
+private fun ModelHeader() {
+    Row(Modifier.fillMaxWidth()) {
+        Cell("주택형", 1.1f, bold = true)
+        Cell("공급면적", 1.3f, bold = true)
+        Cell("세대", 0.5f, bold = true, end = true)
+        Cell("분양가", 1.3f, bold = true, end = true)
+    }
+    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+}
+
+@Composable
+private fun ModelRow(m: HouseModel) {
+    val perPyeong = PriceFormat.perPyeongManwon(m.priceManwon, m.supplyArea)
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Cell(m.houseType.ifBlank { "-" }, 1.1f)
+        Cell(PriceFormat.area(m.supplyArea), 1.3f)
+        Cell("${m.units}", 0.5f, end = true)
+        Column(Modifier.weight(1.3f)) {
+            Text(
+                PriceFormat.full(m.priceManwon),
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (perPyeong > 0) {
+                Text(
+                    "평당 ${PriceFormat.full(perPyeong)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.Cell(
+    text: String,
+    weight: Float,
+    bold: Boolean = false,
+    end: Boolean = false,
+) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = if (bold) FontWeight.Bold else null,
+        textAlign = if (end) TextAlign.End else TextAlign.Start,
+        modifier = Modifier.weight(weight).padding(end = 4.dp),
+    )
 }

@@ -10,6 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.chungyak.advisor.MainActivity
 import com.chungyak.advisor.R
 import com.chungyak.advisor.data.Notice
+import com.chungyak.advisor.ui.PriceFormat
 
 /** Posts on-device local notifications for newly detected 공고. */
 object Notifier {
@@ -49,13 +50,15 @@ object Notifier {
         newNotices.take(5).forEach { n ->
             val schedule = if (n.rank1Start.isNotBlank())
                 "1순위 ${n.rank1Start}" else "모집공고 ${n.noticeDate}"
+            val price = if (n.priceMaxManwon > 0)
+                " · 분양가 ${PriceFormat.range(n.priceMinManwon, n.priceMaxManwon)}" else ""
             val notif = NotificationCompat.Builder(context, CHANNEL_NEW)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle("신규 청약: ${n.name}")
-                .setContentText("${n.areaName} · ${n.totalUnits}세대 · $schedule")
+                .setContentText("${n.areaName} · ${n.totalUnits}세대 · $schedule$price")
                 .setStyle(
                     NotificationCompat.BigTextStyle().bigText(
-                        "${n.areaName} ${n.address}\n${n.totalUnits}세대 · $schedule"
+                        "${n.areaName} ${n.address}\n${n.totalUnits}세대 · $schedule$price"
                     )
                 )
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

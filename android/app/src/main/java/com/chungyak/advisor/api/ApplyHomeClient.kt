@@ -1,5 +1,6 @@
 package com.chungyak.advisor.api
 
+import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -14,9 +15,6 @@ sealed class FetchResult {
     data class Ok(val notices: List<Notice>) : FetchResult()
     data class Error(val message: String) : FetchResult()
 }
-
-/** 주택형별 분양가(만원) 범위. 0 = 미확인. */
-data class PriceRange(val minManwon: Int, val maxManwon: Int)
 
 /**
  * Minimal client for 한국부동산원 청약홈 "분양정보 조회 서비스" on data.go.kr
@@ -73,18 +71,18 @@ object ApplyHomeClient {
     }
 
     /**
-     * Fetch the 분양가 range for one 공고 via the 주택형별 상세 endpoint. Reads
-     * `LTTOT_TOP_AMOUNT` (만원) across all 주택형 and returns the min/max. Returns
-     * null on error/no-data so the worker can leave the price unset (0).
+     * Fetch every 주택형 of one 공고 via the 주택형별 상세 endpoint
+     * (`getAPTLttotPblancMdl`): HOUSE_TY, SUPLY_AR(㎡), SUPLY_HSHLDCO,
+     * LTTOT_TOP_AMOUNT(분양최고금액, 만원). Returns null on error so the caller
+     * retries on a later poll; an empty list means the API had no rows.
      *
-     * Fields confirmed against the 청약홈 OAS and a working reference collector:
-     *   MODEL_NO, HOUSE_TY, SUPLY_AR, SUPLY_HSHLDCO, LTTOT_TOP_AMOUNT.
+     * LTTOT_TOP_AMOUNT was checked equal to the 청약홈 공고 page's 공급금액(최고가).
      */
-    fun fetchPrice(serviceKey: String, houseManageNo: String, pblancNo: String): PriceRange? {
+    fun fetchModels(serviceKey: String, noticeId: String, houseManageNo: String, pblancNo: String): List<HouseModel>? {
         if (serviceKey.isBlank() || houseManageNo.isBlank() || pblancNo.isBlank()) return null
         val h = URLEncoder.encode("cond[HOUSE_MANAGE_NO::EQ]", "UTF-8")
         val p = URLEncoder.encode("cond[PBLANC_NO::EQ]", "UTF-8")
-        val prices = ArrayList<Int>()
+        val out = ArrayList<HouseModel>()
         try {
             var page = 1
             while (page <= 3) {
@@ -92,11 +90,21 @@ object ApplyHomeClient {
                     "&$h=${URLEncoder.encode(houseManageNo, "UTF-8")}" +
                     "&$p=${URLEncoder.encode(pblancNo, "UTF-8")}" +
                     "&serviceKey=${keyParam(serviceKey)}"
-                val json = getJson(url) ?: break
-                if (!json.has("data")) break
+                val json = getJson(url) ?: return null
+                if (!json.has("data")) return null
                 val data = json.getJSONArray("data")
                 for (i in 0 until data.length()) {
-                    manwon(data.getJSONObject(i).optString("LTTOT_TOP_AMOUNT"))?.let { prices.add(it) }
+                    val r = data.getJSONObject(i)
+                    out.add(
+                        HouseModel(
+                            noticeId = noticeId,
+                            modelNo = r.optString("MODEL_NO").ifBlank { "${out.size + 1}" },
+                            houseType = r.optString("HOUSE_TY").trim(),
+                            supplyArea = r.optString("SUPLY_AR").trim().toDoubleOrNull() ?: 0.0,
+                            units = manwon(r.optString("SUPLY_HSHLDCO")) ?: 0,
+                            priceManwon = manwon(r.optString("LTTOT_TOP_AMOUNT")) ?: 0,
+                        )
+                    )
                 }
                 if (data.length() < PER_PAGE) break
                 page++
@@ -104,7 +112,7 @@ object ApplyHomeClient {
         } catch (e: Exception) {
             return null
         }
-        return if (prices.isEmpty()) null else PriceRange(prices.min(), prices.max())
+        return out
     }
 
     private fun request(serviceKey: String, page: Int, since: String): JSONObject? {

@@ -29,6 +29,8 @@ data class Notice(
     // 분양가(주택형별 최고분양가 LTTOT_TOP_AMOUNT, 만원)의 최소/최대. 0 = 미확인.
     val priceMinManwon: Int = 0,
     val priceMaxManwon: Int = 0,
+    // 주택형별 상세를 받아 캐시한 시각(epoch millis). 0 = 아직 못 받음 → 다음 폴링에서 재시도.
+    val modelsFetchedAt: Long = 0,
     val firstSeen: Long,         // epoch millis this row was first collected
     val notified: Boolean,       // whether a local notification was already posted
 )
