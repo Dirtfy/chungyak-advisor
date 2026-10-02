@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 업데이트 APK(cacheDir/updates)만 시스템 설치 화면에 공유. -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

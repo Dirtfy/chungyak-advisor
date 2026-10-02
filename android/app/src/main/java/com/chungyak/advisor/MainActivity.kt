@@ -56,6 +56,7 @@ import com.chungyak.advisor.ui.NoticeViewModel
 import com.chungyak.advisor.ui.PriceFormat
 import com.chungyak.advisor.ui.SortOrder
 import com.chungyak.advisor.ui.theme.ChungyakTheme
+import com.chungyak.advisor.update.UpdateDialog
 
 class MainActivity : ComponentActivity() {
 
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ChungyakTheme {
                 HomeScreen()
+                UpdateDialog()
             }
         }
     }

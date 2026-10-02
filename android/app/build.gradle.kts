@@ -1,9 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+// 앱 버전. versionCode는 여기서 계산(major*10000 + minor*100 + patch) → 릴리스마다 단조 증가.
+val appVersion = "0.4.0"
+val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
+
+// 고정 서명 키: 저장소 밖(../../signing)에 영속 보관, 절대 커밋 금지.
+// 빌드마다 새로 생기는 디버그 키로 서명하면 덮어쓰기 업데이트가 실패하므로 모든 빌드를 이 키로 서명.
+// 다른 위치면 CHUNGYAK_SIGNING_PROPS=<경로>/keystore.properties 로 지정.
+val signingProps = (System.getenv("CHUNGYAK_SIGNING_PROPS")?.let(::File)
+    ?: rootProject.file("../../signing/keystore.properties"))
+    .takeIf { it.isFile }
+    ?.let { f -> Properties().apply { f.inputStream().use(::load) } to f.parentFile }
 
 android {
     namespace = "com.chungyak.advisor"
@@ -13,12 +27,27 @@ android {
         applicationId = "com.chungyak.advisor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = appVersionCode
+        versionName = appVersion
         vectorDrawables { useSupportLibrary = true }
     }
 
+    signingConfigs {
+        signingProps?.let { (p, dir) ->
+            create("fixed") {
+                storeFile = File(dir, p.getProperty("storeFile"))
+                storePassword = p.getProperty("storePassword")
+                keyAlias = p.getProperty("keyAlias")
+                keyPassword = p.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        signingConfigs.findByName("fixed")?.let { fixed ->
+            getByName("debug").signingConfig = fixed
+            getByName("release").signingConfig = fixed
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -34,7 +63,10 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
