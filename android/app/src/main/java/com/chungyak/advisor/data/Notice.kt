@@ -31,6 +31,12 @@ data class Notice(
     val priceMaxManwon: Int = 0,
     // 주택형별 상세를 받아 캐시한 시각(epoch millis). 0 = 아직 못 받음 → 다음 폴링에서 재시도.
     val modelsFetchedAt: Long = 0,
+    // 경쟁률 요약(1순위 해당지역 기준, 없으면 전체). 0 = 데이터 없음.
+    val cmpetMaxRate: Double = 0.0,
+    val cmpetAvgRate: Double = 0.0,
+    // 경쟁률을 마지막으로 받은 시각(0 = 아직) / 확정 여부(true면 더 이상 재조회 안 함).
+    val cmpetFetchedAt: Long = 0,
+    val cmpetFinal: Boolean = false,
     val firstSeen: Long,         // epoch millis this row was first collected
     val notified: Boolean,       // whether a local notification was already posted
 )

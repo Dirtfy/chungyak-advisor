@@ -37,12 +37,24 @@ class Settings(context: Context) {
 
     val hasKey: Boolean get() = serviceKey.isNotBlank()
 
+    /** 목록 정렬 (SortOrder.name). 다음 실행에도 유지. */
+    var sortOrder: String
+        get() = prefs.getString(KEY_SORT, "").orEmpty()
+        set(v) = prefs.edit().putString(KEY_SORT, v).apply()
+
+    /** 마지막 경쟁률 호출이 401(경쟁률 서비스 미신청)이었는지. 성공하면 false로 복귀. */
+    var cmpetUnauthorized: Boolean
+        get() = prefs.getBoolean(KEY_CMPET_UNAUTH, false)
+        set(v) = prefs.edit().putBoolean(KEY_CMPET_UNAUTH, v).apply()
+
     companion object {
         private const val KEY_SERVICE_KEY = "service_key"
         private const val KEY_LOOKBACK = "lookback_days"
         private const val KEY_REGIONS = "regions"
         private const val KEY_LAST_CHECK = "last_check"
         private const val KEY_LAST_RESULT = "last_result"
+        private const val KEY_SORT = "sort_order"
+        private const val KEY_CMPET_UNAUTH = "cmpet_unauthorized"
 
         /** 수도권 default: Seoul, Gyeonggi, Incheon. */
         val DEFAULT_REGIONS = setOf("서울", "경기", "인천")

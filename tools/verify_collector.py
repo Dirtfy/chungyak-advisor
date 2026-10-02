@@ -80,7 +80,7 @@ def price_range(key, h, p):
 
 
 def competition(key, h, p):
-    """getAPTLttotPblancCmpet — 접수 마감 공고만 값이 있음. 발견 모드로 필드 노출."""
+    """getAPTLttotPblancCmpet — 접수 후 공고만 값이 있음. 필드는 공식 OAS 기준."""
     js, err = get(key, CMPET, "getAPTLttotPblancCmpet",
                   {"page": 1, "perPage": PER_PAGE, "returnType": "JSON",
                    "cond[HOUSE_MANAGE_NO::EQ]": h, "cond[PBLANC_NO::EQ]": p})
@@ -140,15 +140,20 @@ def run(key, lookback_days, deep=True):
         cmp_, err = competition(key, r.get("HOUSE_MANAGE_NO"), r.get("PBLANC_NO"))
         if err:
             print(f"    - {r.get('HOUSE_NM')}: 오류 {err}")
+            if "401" in str(err):
+                print("      → 경쟁률 서비스(data.go.kr 15098905) 활용신청 필요. 앱은 '활용신청 필요'로 안내하고 계속 동작.")
+                return
             shown += 1
             continue
         if not cmp_:
             continue  # 아직 경쟁률 미공개
         print(f"    - [{r.get('SUBSCRPT_AREA_CODE_NM')}] {r.get('HOUSE_NM')} "
               f"(공고 {iso(r.get('RCRIT_PBLANC_DE'))}) · 경쟁률 rows={len(cmp_)}")
-        print("       필드:", sorted(cmp_[0].keys()))
-        for row in cmp_[:3]:
-            print("       ·", {k: row.get(k) for k in list(cmp_[0].keys())[:9]})
+        # 앱(CompetitionParser.kt)이 읽는 공식 OAS 필드
+        for row in cmp_[:6]:
+            print(f"       · {row.get('HOUSE_TY')} {row.get('SUBSCRPT_RANK_CODE')}순위 "
+                  f"{row.get('RESIDE_SENM') or row.get('RESIDE_SECD')} · 공급 {row.get('SUPLY_HSHLDCO')} "
+                  f"· 접수 {row.get('REQ_CNT')} · 경쟁률 {row.get('CMPET_RATE')}")
         shown += 1
     if shown == 0:
         print("    (조회 구간에 접수 마감된 공고가 없어 경쟁률 값이 아직 없음 — 정상)")

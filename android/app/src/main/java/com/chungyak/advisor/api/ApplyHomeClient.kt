@@ -1,5 +1,6 @@
 package com.chungyak.advisor.api
 
+import com.chungyak.advisor.data.Competition
 import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import org.json.JSONObject
@@ -14,6 +15,13 @@ import java.util.Locale
 sealed class FetchResult {
     data class Ok(val notices: List<Notice>) : FetchResult()
     data class Error(val message: String) : FetchResult()
+}
+
+/** Result of one 경쟁률 lookup. [Unauthorized] = 키가 경쟁률 서비스에 활용신청되지 않음(HTTP 401). */
+sealed class CompetitionFetch {
+    data class Ok(val rows: List<Competition>) : CompetitionFetch()
+    data object Unauthorized : CompetitionFetch()
+    data object Failed : CompetitionFetch()
 }
 
 /**
@@ -32,8 +40,12 @@ object ApplyHomeClient {
     // 주택형별 상세(면적·세대수·분양가). 분양가는 LTTOT_TOP_AMOUNT(만원)에 있고
     // 목록 엔드포인트(getAPTLttotPblancDetail)에는 없다 → 공고별 2차 호출로 결합.
     private const val MDL_ENDPOINT = "getAPTLttotPblancMdl"
+    // 경쟁률은 별도 서비스(data.go.kr에서 따로 활용신청 필요). 접수 후에만 행이 있다.
+    private const val CMPET_BASE = "https://api.odcloud.kr/api/ApplyhomeInfoCmpetRtSvc/v1"
+    private const val CMPET_ENDPOINT = "getAPTLttotPblancCmpet"
     private const val PER_PAGE = 100
     private const val MAX_PAGES = 10
+    private const val HTTP_CODE = "_httpCode"
 
     /**
      * Fetch APT 일반공급 공고 whose 모집공고일 is within [lookbackDays], keeping
@@ -115,6 +127,43 @@ object ApplyHomeClient {
         return out
     }
 
+    /**
+     * Fetch every 경쟁률 row (주택형 × 순위 × 거주지역) of one 공고. HTTP 401 / odcloud
+     * auth error codes map to [CompetitionFetch.Unauthorized] so the UI can ask the
+     * user to 활용신청 instead of failing; other errors → [CompetitionFetch.Failed].
+     */
+    fun fetchCompetition(serviceKey: String, noticeId: String, houseManageNo: String, pblancNo: String): CompetitionFetch {
+        if (serviceKey.isBlank() || houseManageNo.isBlank() || pblancNo.isBlank()) return CompetitionFetch.Failed
+        val h = URLEncoder.encode("cond[HOUSE_MANAGE_NO::EQ]", "UTF-8")
+        val p = URLEncoder.encode("cond[PBLANC_NO::EQ]", "UTF-8")
+        val out = ArrayList<Competition>()
+        try {
+            var page = 1
+            while (page <= 3) {
+                val url = "$CMPET_BASE/$CMPET_ENDPOINT?page=$page&perPage=$PER_PAGE&returnType=JSON" +
+                    "&$h=${URLEncoder.encode(houseManageNo, "UTF-8")}" +
+                    "&$p=${URLEncoder.encode(pblancNo, "UTF-8")}" +
+                    "&serviceKey=${keyParam(serviceKey)}"
+                val json = getJson(url) ?: return CompetitionFetch.Failed
+                if (!json.has("data")) {
+                    val code = json.optInt("code", 0)
+                    return if (json.optInt(HTTP_CODE) == 401 || code == -401 || code == -4)
+                        CompetitionFetch.Unauthorized else CompetitionFetch.Failed
+                }
+                val data = json.getJSONArray("data")
+                for (i in 0 until data.length()) {
+                    val r = data.getJSONObject(i)
+                    out.add(CompetitionParser.row(noticeId) { r.optString(it) })
+                }
+                if (data.length() < PER_PAGE) break
+                page++
+            }
+        } catch (e: Exception) {
+            return CompetitionFetch.Failed
+        }
+        return CompetitionFetch.Ok(out)
+    }
+
     private fun request(serviceKey: String, page: Int, since: String): JSONObject? {
         val cond = URLEncoder.encode("cond[RCRIT_PBLANC_DE::GTE]", "UTF-8")
         val url = "$BASE/$ENDPOINT?page=$page&perPage=$PER_PAGE&returnType=JSON" +
@@ -143,11 +192,12 @@ object ApplyHomeClient {
             val body = stream?.bufferedReader()?.use { it.readText() } ?: return null
             val trimmed = body.trimStart()
             // Non-JSON (XML error page) when the key is unregistered/expired.
-            if (!trimmed.startsWith("{")) {
+            val json = if (!trimmed.startsWith("{")) {
                 JSONObject().put("msg", "HTTP $code: 서비스키가 유효하지 않을 수 있습니다.")
             } else {
                 JSONObject(trimmed)
             }
+            json.put(HTTP_CODE, code)
         } finally {
             conn.disconnect()
         }

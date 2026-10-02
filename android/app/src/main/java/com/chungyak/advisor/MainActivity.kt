@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,11 +47,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.chungyak.advisor.data.Competition
 import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
+import com.chungyak.advisor.ui.CompetitionFormat
 import com.chungyak.advisor.ui.NoticeViewModel
 import com.chungyak.advisor.ui.PriceFormat
+import com.chungyak.advisor.ui.SortOrder
 import com.chungyak.advisor.ui.theme.ChungyakTheme
 
 class MainActivity : ComponentActivity() {
@@ -77,6 +82,10 @@ class MainActivity : ComponentActivity() {
 private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     val notices by vm.notices.collectAsState()
     val status by vm.status.collectAsState()
+    val sort by vm.sort.collectAsState()
+    // 백그라운드 수집이 DB를 바꾸면 상태 문구/경쟁률 신청 안내도 다시 읽는다.
+    LaunchedEffect(notices) { vm.refreshStatus() }
+    val today = vm.today()
     var showSettings by remember { mutableStateOf(!vm.hasKey) }
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = notices.firstOrNull { it.id == selectedId }
@@ -117,7 +126,8 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
                 "수집된 공고 ${notices.size}건",
                 style = MaterialTheme.typography.titleMedium,
             )
-            Spacer(Modifier.height(8.dp))
+            SortBar(sort, vm::setSort)
+            Spacer(Modifier.height(4.dp))
 
             if (notices.isEmpty()) {
                 Text(
@@ -129,9 +139,23 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
                 )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(notices, key = { it.id }) { NoticeRow(it) { selectedId = it.id } }
+                    items(notices, key = { it.id }) {
+                        NoticeRow(it, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized)) { selectedId = it.id }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SortBar(selected: SortOrder, onSelect: (SortOrder) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        SortOrder.entries.forEach { o ->
+            FilterChip(selected = o == selected, onClick = { onSelect(o) }, label = { Text(o.label) })
         }
     }
 }
@@ -193,7 +217,7 @@ private fun SettingsCard(vm: NoticeViewModel, onSaved: () -> Unit) {
 }
 
 @Composable
-private fun NoticeRow(n: Notice, onClick: () -> Unit) {
+private fun NoticeRow(n: Notice, cmpet: String, onClick: () -> Unit) {
     Card(
         Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(),
@@ -215,6 +239,7 @@ private fun NoticeRow(n: Notice, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
             )
+            Text("경쟁률 $cmpet", style = MaterialTheme.typography.bodySmall)
             if (n.speculationArea || n.adjustmentArea) {
                 Spacer(Modifier.height(2.dp))
                 val tags = buildList {
@@ -236,6 +261,8 @@ private fun priceSummary(n: Notice): String =
 @Composable
 private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, onBack: () -> Unit) {
     val models by remember(n.id) { vm.models(n.id) }.collectAsState(initial = emptyList())
+    val cmpets by remember(n.id) { vm.competitions(n.id) }.collectAsState(initial = emptyList())
+    val cmpetSummary = CompetitionFormat.summary(n, vm.today(), vm.cmpetUnauthorized)
     val uri = LocalUriHandler.current
 
     Scaffold(
@@ -281,10 +308,36 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, onBack: () -> Uni
                     }
                 }
             }
+            Spacer(Modifier.height(12.dp))
+            Text("경쟁률 $cmpetSummary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("주택형별 경쟁률 (일반공급)", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(8.dp))
+                    if (cmpets.isEmpty()) {
+                        Text(
+                            when (cmpetSummary) {
+                                CompetitionFormat.BEFORE -> "접수 전입니다. 접수가 시작되면 경쟁률을 받아옵니다."
+                                CompetitionFormat.NEED_APPLY ->
+                                    "경쟁률은 별도 공공데이터 서비스입니다. data.go.kr에서 " +
+                                        "'한국부동산원_청약홈 청약접수 경쟁률 및 특별공급 신청현황 조회 서비스'(15098905) 활용신청 후 같은 키로 자동 표시됩니다."
+                                CompetitionFormat.PENDING -> "접수 결과 집계 중입니다. 다음 확인 때 다시 받아옵니다."
+                                else -> CompetitionFormat.NONE
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else {
+                        CmpetHeader()
+                        cmpets.forEach { CmpetRow(it) }
+                    }
+                }
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 "· 분양가: 청약홈 주택형별 공급금액(분양최고금액). 평당가 = 분양가 ÷ 공급면적(평, 1평=3.3058㎡).\n" +
-                    "· 세대수: 일반공급 기준. 옵션·발코니 확장비 제외 — 정확한 금액은 모집공고문 확인.",
+                    "· 세대수: 일반공급 기준. 옵션·발코니 확장비 제외 — 정확한 금액은 모집공고문 확인.\n" +
+                    "· 경쟁률: 청약홈 접수 결과(목록 값은 1순위 해당지역 기준, 평균 = 접수 합 ÷ 공급 합). △ = 미달 세대수.",
                 style = MaterialTheme.typography.labelSmall,
             )
             if (n.url.isNotBlank()) {
@@ -331,6 +384,29 @@ private fun ModelRow(m: HouseModel) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun CmpetHeader() {
+    Row(Modifier.fillMaxWidth()) {
+        Cell("주택형", 1.1f, bold = true)
+        Cell("순위·지역", 1.1f, bold = true)
+        Cell("공급", 0.5f, bold = true, end = true)
+        Cell("접수", 0.7f, bold = true, end = true)
+        Cell("경쟁률", 0.9f, bold = true, end = true)
+    }
+    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+}
+
+@Composable
+private fun CmpetRow(c: Competition) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Cell(c.houseType.ifBlank { "-" }, 1.1f)
+        Cell("${c.rank}순위 ${c.resideName.ifBlank { c.resideCode }}", 1.1f)
+        Cell("${c.units}", 0.5f, end = true)
+        Cell("%,d".format(c.requests), 0.7f, end = true)
+        Cell(c.rateText.ifBlank { CompetitionFormat.rate(c.rate) }, 0.9f, end = true)
     }
 }
 

@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.chungyak.advisor.api.ApplyHomeClient
+import com.chungyak.advisor.api.CompetitionFetch
+import com.chungyak.advisor.api.CompetitionParser
 import com.chungyak.advisor.api.FetchResult
 import com.chungyak.advisor.data.AppDatabase
+import com.chungyak.advisor.data.CompetitionPolicy
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
 import com.chungyak.advisor.notify.Notifier
@@ -57,13 +60,20 @@ class CheckWorker(
                 // 분양가는 목록에 없어 주택형별 상세를 공고별 2차 호출로 받아 캐시한다.
                 // 한 번 받으면 다시 부르지 않고, 실패분만 다음 폴링에서 재시도(쿼터·지연 절약).
                 val priced = cacheModels(settings.serviceKey)
+                // 경쟁률은 별도 서비스: 401이어도 다른 기능엔 영향 없이 안내만 남긴다.
+                val cmpet = cacheCompetition(settings)
                 if (fresh.isNotEmpty()) {
                     Notifier.notifyNew(applicationContext, fresh.map { priced[it.id] ?: it })
                     dao.markNotified(fresh.map { it.id })
                 }
                 settings.lastResult =
                     "$stamp · 조회 ${result.notices.size}건 · 신규 ${fresh.size}건" +
-                        (if (priced.isNotEmpty()) " · 분양가 ${priced.size}건" else "")
+                        (if (priced.isNotEmpty()) " · 분양가 ${priced.size}건" else "") +
+                        when {
+                            settings.cmpetUnauthorized -> " · 경쟁률: data.go.kr 활용신청 필요"
+                            cmpet > 0 -> " · 경쟁률 ${cmpet}건"
+                            else -> ""
+                        }
                 Result.success()
             }
         }
@@ -92,7 +102,40 @@ class CheckWorker(
         return out
     }
 
+    /**
+     * 접수가 시작된 미확정 공고의 경쟁률을 받아 캐시(회당 [CMPET_PER_RUN]건, [CompetitionPolicy]
+     * 간격). 401이면 즉시 중단하고 [Settings.cmpetUnauthorized]를 켠다. 반환: 갱신한 공고 수.
+     */
+    private suspend fun cacheCompetition(settings: Settings): Int {
+        val db = AppDatabase.get(applicationContext)
+        val dao = db.noticeDao()
+        val now = System.currentTimeMillis()
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.KOREA).format(Date(now))
+        val due = dao.withoutFinalCompetition()
+            .filter { CompetitionPolicy.shouldFetch(it, today, now) }
+            .take(CMPET_PER_RUN)
+        var updated = 0
+        for (n in due) {
+            when (val r = ApplyHomeClient.fetchCompetition(settings.serviceKey, n.id, n.houseManageNo, n.pblancNo)) {
+                is CompetitionFetch.Unauthorized -> {
+                    settings.cmpetUnauthorized = true
+                    return updated
+                }
+                is CompetitionFetch.Failed -> continue
+                is CompetitionFetch.Ok -> {
+                    settings.cmpetUnauthorized = false
+                    db.competitionDao().replaceFor(n.id, r.rows)
+                    val (max, avg) = CompetitionParser.summary(r.rows)
+                    dao.setCompetition(n.id, max, avg, now, CompetitionPolicy.isFinal(n, today))
+                    updated++
+                }
+            }
+        }
+        return updated
+    }
+
     private companion object {
         const val MODELS_PER_RUN = 20
+        const val CMPET_PER_RUN = 20
     }
 }
