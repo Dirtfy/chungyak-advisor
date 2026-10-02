@@ -47,7 +47,32 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_CMPET_UNAUTH, false)
         set(v) = prefs.edit().putBoolean(KEY_CMPET_UNAUTH, v).apply()
 
+    /** 첫 수집을 '기준선'으로 처리했는지(재설치 직후 기존 공고가 한꺼번에 알림으로 쏟아지지 않게). */
+    var baselineDone: Boolean
+        get() = prefs.getBoolean(KEY_BASELINE, false)
+        set(v) = prefs.edit().putBoolean(KEY_BASELINE, v).apply()
+
+    /**
+     * 설정 스키마 마이그레이션. 키 이름/형식을 바꿀 때는 [PREFS_VERSION]을 올리고 아래에 단계를
+     * 추가한다(기존 단계는 지우지 않는다). 앱 시작 시 1회 호출. 업데이트 시 설정 보존이 목적.
+     */
+    fun migrate() {
+        var v = prefs.getInt(KEY_PREFS_VERSION, 0)
+        if (v >= PREFS_VERSION) return
+        val e = prefs.edit()
+        if (v < 1) {
+            // 0 → 1 (v0.4.1): 기존 키 그대로 유지. 이미 수집 이력이 있는 기존 사용자는 기준선 완료로 간주.
+            if (prefs.getLong(KEY_LAST_CHECK, 0L) > 0L) e.putBoolean(KEY_BASELINE, true)
+            v = 1
+        }
+        e.putInt(KEY_PREFS_VERSION, v).apply()
+    }
+
     companion object {
+        const val PREFS_VERSION = 1
+        private const val KEY_PREFS_VERSION = "prefs_version"
+        private const val KEY_BASELINE = "baseline_done"
+
         private const val KEY_SERVICE_KEY = "service_key"
         private const val KEY_LOOKBACK = "lookback_days"
         private const val KEY_REGIONS = "regions"

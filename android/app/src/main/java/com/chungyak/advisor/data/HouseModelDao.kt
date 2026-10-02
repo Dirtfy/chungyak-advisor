@@ -15,6 +15,9 @@ interface HouseModelDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(models: List<HouseModel>)
 
+    @Query("SELECT * FROM house_models")
+    suspend fun all(): List<HouseModel>
+
     @Query("DELETE FROM house_models")
     suspend fun clear()
 }

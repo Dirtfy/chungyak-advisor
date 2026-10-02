@@ -56,18 +56,24 @@ class CheckWorker(
                 val dao = AppDatabase.get(applicationContext).noticeDao()
                 val existing = dao.allIds().toHashSet()
                 val fresh = result.notices.filter { it.id !in existing }
-                if (fresh.isNotEmpty()) dao.insertAll(fresh)
+                // 첫 수집(새 설치·재설치 직후)은 기준선: 이미 올라와 있는 공고를 한꺼번에 알리지 않는다.
+                val baseline = !settings.baselineDone && existing.isEmpty()
+                settings.baselineDone = true
+                if (fresh.isNotEmpty()) {
+                    dao.insertAll(if (baseline) fresh.map { it.copy(notified = true) } else fresh)
+                }
                 // 분양가는 목록에 없어 주택형별 상세를 공고별 2차 호출로 받아 캐시한다.
                 // 한 번 받으면 다시 부르지 않고, 실패분만 다음 폴링에서 재시도(쿼터·지연 절약).
                 val priced = cacheModels(settings.serviceKey)
                 // 경쟁률은 별도 서비스: 401이어도 다른 기능엔 영향 없이 안내만 남긴다.
                 val cmpet = cacheCompetition(settings)
-                if (fresh.isNotEmpty()) {
+                if (fresh.isNotEmpty() && !baseline) {
                     Notifier.notifyNew(applicationContext, fresh.map { priced[it.id] ?: it })
                     dao.markNotified(fresh.map { it.id })
                 }
                 settings.lastResult =
                     "$stamp · 조회 ${result.notices.size}건 · 신규 ${fresh.size}건" +
+                        (if (baseline && fresh.isNotEmpty()) "(첫 수집: 알림 생략)" else "") +
                         (if (priced.isNotEmpty()) " · 분양가 ${priced.size}건" else "") +
                         when {
                             settings.cmpetUnauthorized -> " · 경쟁률: data.go.kr 활용신청 필요"

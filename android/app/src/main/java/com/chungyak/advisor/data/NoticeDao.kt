@@ -41,6 +41,13 @@ interface NoticeDao {
     )
     suspend fun setCompetition(id: String, max: Double, avg: Double, at: Long, isFinal: Boolean)
 
+    @Query("SELECT * FROM notices")
+    suspend fun all(): List<Notice>
+
+    /** 백업 가져오기: 같은 id는 백업 값으로 교체(알림 여부 포함). */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(notices: List<Notice>)
+
     @Query("DELETE FROM notices")
     suspend fun clear()
 

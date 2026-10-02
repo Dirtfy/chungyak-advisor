@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -213,6 +214,27 @@ private fun SettingsCard(vm: NoticeViewModel, onSaved: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { vm.saveSettings(); onSaved() }) { Text("저장") }
                 OutlinedButton(onClick = { vm.clearAll() }) { Text("수집목록 비우기") }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text("백업 (재설치·기기 변경 시 데이터 옮기기)", style = MaterialTheme.typography.bodyMedium)
+            val exporter = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("application/json")
+            ) { uri -> uri?.let(vm::exportBackup) }
+            val importer = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri -> uri?.let(vm::importBackup) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { exporter.launch("chungyak-radar-backup.json") }) { Text("백업 내보내기") }
+                OutlinedButton(onClick = { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }) {
+                    Text("백업 가져오기")
+                }
+            }
+            Text(
+                "백업 파일에는 서비스키가 들어 있습니다. 다른 사람과 공유하지 마세요.",
+                style = MaterialTheme.typography.labelSmall,
+            )
+            if (vm.backupMessage.isNotBlank()) {
+                Text(vm.backupMessage, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

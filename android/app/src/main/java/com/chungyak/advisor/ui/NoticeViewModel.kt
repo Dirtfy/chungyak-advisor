@@ -83,6 +83,40 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
         cmpetUnauthorized = settings.cmpetUnauthorized
     }
 
+    /** 백업 내보내기/가져오기 결과 문구(설정 카드에 표시). */
+    var backupMessage by mutableStateOf("")
+        private set
+
+    fun exportBackup(uri: android.net.Uri) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            backupMessage = runCatching {
+                val text = com.chungyak.advisor.data.Backup.export(app)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    app.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) }
+                }
+                "백업 저장 완료 (공고 ${notices.value.size}건 + 설정·서비스키)"
+            }.getOrElse { "백업 실패: ${it.message}" }
+        }
+    }
+
+    fun importBackup(uri: android.net.Uri) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            backupMessage = runCatching {
+                val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    app.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() }
+                }
+                val r = com.chungyak.advisor.data.Backup.import(app, text)
+                serviceKey = settings.serviceKey
+                lookbackDays = settings.lookbackDays.toString()
+                regions = settings.regions
+                _sort.value = SortOrder.of(settings.sortOrder)
+                "가져오기 완료: 공고 ${r.notices}건, 주택형 ${r.models}건, 경쟁률 ${r.competitions}건 + 설정"
+            }.getOrElse { "가져오기 실패: ${it.message}" }
+        }
+    }
+
     fun clearAll() {
         viewModelScope.launch {
             db.houseModelDao().clear()

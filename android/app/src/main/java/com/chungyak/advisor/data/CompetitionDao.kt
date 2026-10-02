@@ -26,6 +26,9 @@ interface CompetitionDao {
         insertAll(rows)
     }
 
+    @Query("SELECT * FROM competitions")
+    suspend fun all(): List<Competition>
+
     @Query("DELETE FROM competitions")
     suspend fun clear()
 }
