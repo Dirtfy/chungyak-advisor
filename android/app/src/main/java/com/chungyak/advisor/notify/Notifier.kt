@@ -1,5 +1,6 @@
 package com.chungyak.advisor.notify
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -12,22 +13,63 @@ import com.chungyak.advisor.R
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.ui.PriceFormat
 
-/** Posts on-device local notifications for newly detected 공고. */
+/**
+ * Posts on-device local notifications for newly detected 공고.
+ *
+ * 스마트밴드(Galaxy Fit 등)는 Galaxy Wearable 앱이 폰 알림을 미러링해서 받는다. 그래서
+ * 일반(이벤트성) 알림으로만 게시한다: ongoing 아님, IMPORTANCE_HIGH + 진동 패턴 채널,
+ * setLocalOnly(false), 카테고리 지정, 밴드 화면에 맞게 짧은 제목/본문.
+ */
 object Notifier {
 
-    const val CHANNEL_NEW = "new_notices"
+    /** v0.4.3~ 채널. 진동 패턴은 채널 생성 후 못 바꾸므로 새 ID로 옮겼다. */
+    const val CHANNEL_NEW = "new_notices_v2"
+    /** v0.4.2 이하 채널(진동 미지정). [ensureChannel]이 설정을 옮기고 삭제한다. */
+    const val CHANNEL_LEGACY = "new_notices"
+
+    val VIBRATION = longArrayOf(0, 400, 200, 400)
 
     fun ensureChannel(context: Context) {
         val mgr = context.getSystemService(NotificationManager::class.java)
         if (mgr.getNotificationChannel(CHANNEL_NEW) == null) {
+            // 사용자가 예전 채널을 꺼 두었다면 그 선택을 유지한다.
+            val legacy = mgr.getNotificationChannel(CHANNEL_LEGACY)
+            val blocked = legacy?.importance == NotificationManager.IMPORTANCE_NONE
             val ch = NotificationChannel(
                 CHANNEL_NEW,
                 context.getString(R.string.notif_channel_new),
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply { description = context.getString(R.string.notif_channel_new_desc) }
+                if (blocked) NotificationManager.IMPORTANCE_NONE else NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = context.getString(R.string.notif_channel_new_desc)
+                enableVibration(true)
+                vibrationPattern = VIBRATION
+                enableLights(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
+            }
             mgr.createNotificationChannel(ch)
         }
+        if (mgr.getNotificationChannel(CHANNEL_LEGACY) != null) mgr.deleteNotificationChannel(CHANNEL_LEGACY)
     }
+
+    /** 공통 설정: 밴드로 미러링되는 일반 알림. */
+    private fun base(context: Context, intent: PendingIntent) =
+        NotificationCompat.Builder(context, CHANNEL_NEW)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setVibrate(VIBRATION)
+            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_LIGHTS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(false)
+            .setLocalOnly(false)
+            .setOnlyAlertOnce(false)
+            .setAutoCancel(true)
+            .setContentIntent(intent)
+
+    /** 밴드 화면용 짧은 제목: 단지명이 길면 자른다. */
+    fun shortTitle(name: String, max: Int = 18): String =
+        "신규 청약 " + (if (name.length > max) name.take(max - 1) + "…" else name)
 
     /**
      * Notify about [newNotices]. One notification per 공고 (up to a small cap),
@@ -52,18 +94,15 @@ object Notifier {
                 "1순위 ${n.rank1Start}" else "모집공고 ${n.noticeDate}"
             val price = if (n.priceMaxManwon > 0)
                 " · 분양가 ${PriceFormat.range(n.priceMinManwon, n.priceMaxManwon)}" else ""
-            val notif = NotificationCompat.Builder(context, CHANNEL_NEW)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("신규 청약: ${n.name}")
-                .setContentText("${n.areaName} · ${n.totalUnits}세대 · $schedule$price")
+            // 밴드에는 제목+본문 한 줄이 보인다. 상세(주소·세대수·분양가)는 폰의 펼친 알림에.
+            val notif = base(context, contentIntent)
+                .setContentTitle(shortTitle(n.name))
+                .setContentText("${n.areaName} · $schedule")
                 .setStyle(
                     NotificationCompat.BigTextStyle().bigText(
-                        "${n.areaName} ${n.address}\n${n.totalUnits}세대 · $schedule$price"
+                        "${n.name}\n${n.areaName} ${n.address}\n${n.totalUnits}세대 · $schedule$price"
                     )
                 )
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .setContentIntent(contentIntent)
                 .build()
             try {
                 nm.notify(n.id.hashCode(), notif)
@@ -73,12 +112,9 @@ object Notifier {
         }
 
         if (newNotices.size > 5) {
-            val summary = NotificationCompat.Builder(context, CHANNEL_NEW)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("신규 청약 공고 ${newNotices.size}건")
-                .setContentText("수도권 일반공급 신규 공고가 도착했습니다.")
-                .setAutoCancel(true)
-                .setContentIntent(contentIntent)
+            val summary = base(context, contentIntent)
+                .setContentTitle("신규 청약 ${newNotices.size}건")
+                .setContentText("앱에서 전체 목록 확인")
                 .build()
             try {
                 nm.notify(1, summary)
