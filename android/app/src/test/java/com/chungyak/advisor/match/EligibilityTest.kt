@@ -204,6 +204,17 @@ class EligibilityTest {
         assertFalse(Eligibility.shouldNotify(seoulHead, NotifyMode.ELIGIBLE_OR_CHECK, bad))
     }
 
+    @Test fun accountOpenedDate_recomputedAtEachNoticeDate() {
+        // 2024-11-20 가입: 2026-10-01 공고 기준 22개월 → 규제지역 1순위(24개월) 미달, 2026-11-20 이후 공고면 충족.
+        val p = seoulHead.copy(accountOpened = "2024-11-20", accountMonths = 60)
+        val early = Eligibility.evaluate(p, seoulNotice(), listOf(model()))
+        assertEquals(Verdict.INELIGIBLE, track(early, "일반공급").verdict)
+        assertTrue(track(early, "일반공급").reasons.any { it.contains("22개월") })
+        assertTrue(early.notes.any { it.contains("1년 10개월 (22개월)") })
+        val later = Eligibility.evaluate(p, seoulNotice().copy(noticeDate = "2026-11-20"), listOf(model()))
+        assertEquals(Verdict.ELIGIBLE, track(later, "일반공급 1순위").verdict)
+    }
+
     @Test fun marriageMonths() {
         assertEquals(55, Eligibility.marriageMonths("2022-03", "2026-10-01"))
         assertEquals(null, Eligibility.marriageMonths("", "2026-10-01"))

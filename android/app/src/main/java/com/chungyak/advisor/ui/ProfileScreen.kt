@@ -34,10 +34,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDatePickerState
+import com.chungyak.advisor.match.AccountPeriod
 import com.chungyak.advisor.match.AccountType
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.match.NotifyMode
 import com.chungyak.advisor.match.Profile
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /** 내 청약 조건 입력 화면. 저장 값은 기기 안(ProfileStore)에만 남는다. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -130,7 +138,12 @@ fun ProfileScreen(initial: Profile, initialMode: NotifyMode, onSave: (Profile, N
 
             Section("청약통장")
             Chips(AccountType.entries, p.account, { it.label }) { p = p.copy(account = it) }
-            num("accountMonths", "가입 기간(개월)")
+            AccountOpenedField(
+                opened = p.accountOpened,
+                onChange = { p = p.copy(accountOpened = it) },
+                manualMonths = nums.value["accountMonths"]?.toIntOrNull(),
+            )
+            num("accountMonths", "또는 가입 기간 직접 입력(개월) — 가입 일자가 있으면 그걸 우선")
             num("payments", "납입 인정 회차(국민주택용)")
             num("depositManwon", "예치금·납입 총액(만원)")
 
@@ -166,6 +179,8 @@ fun ProfileScreen(initial: Profile, initialMode: NotifyMode, onSave: (Profile, N
                     val built = build()
                     error = when {
                         built.sido.isBlank() -> "거주 시·도를 골라 주세요."
+                        built.accountOpened.isNotBlank() && AccountPeriod.parse(built.accountOpened).let { it == null || it.isAfter(LocalDate.now()) } ->
+                            "청약통장 가입 일자가 올바르지 않습니다(미래 날짜 불가)."
                         built.married && built.marriageYm.isNotBlank() &&
                             !Regex("^\\d{4}-\\d{1,2}$").matches(built.marriageYm) -> "혼인신고 연월은 2022-05 형식으로 입력하세요."
                         else -> ""
@@ -181,6 +196,58 @@ fun ProfileScreen(initial: Profile, initialMode: NotifyMode, onSave: (Profile, N
             )
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+/** 청약통장 가입 일자: 날짜 선택기(미래 날짜 선택 불가) + 오늘 기준 계산된 가입 기간 표시. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AccountOpenedField(opened: String, onChange: (String) -> Unit, manualMonths: Int?) {
+    var picking by remember { mutableStateOf(false) }
+    val date = AccountPeriod.parse(opened)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            if (date != null) "가입 일자 $date" else "가입 일자 미입력",
+            Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+        )
+        OutlinedButton(onClick = { picking = true }) { Text(if (date != null) "변경" else "날짜 선택") }
+        if (date != null) TextButton(onClick = { onChange("") }) { Text("지우기") }
+    }
+    val info = when {
+        date != null -> "가입 ${AccountPeriod.label(AccountPeriod.months(date, LocalDate.now()))} · 오늘 기준. " +
+            "판정은 공고일 기준으로 매번 다시 계산합니다." + if (manualMonths != null) " (직접 입력한 기간보다 우선)" else ""
+        manualMonths != null -> "직접 입력: 가입 ${AccountPeriod.label(manualMonths)} — 가입 일자를 넣으면 기간이 자동으로 늘어납니다."
+        else -> "가입 일자를 넣으면 기간을 자동 계산합니다."
+    }
+    Text(info, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+
+    if (picking) {
+        val zone = ZoneOffset.UTC // DatePicker는 UTC 자정 millis를 쓴다.
+        val todayMillis = LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = date?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
+            yearRange = 1977..LocalDate.now().year,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
+                override fun isSelectableYear(year: Int) = year <= LocalDate.now().year
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(
+                    enabled = state.selectedDateMillis != null,
+                    onClick = {
+                        state.selectedDateMillis?.let { ms ->
+                            val d = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+                            if (!d.isAfter(LocalDate.now())) onChange(d.toString())
+                        }
+                        picking = false
+                    },
+                ) { Text("확인") }
+            },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("취소") } },
+        ) { DatePicker(state = state, title = { Text("청약통장 가입 일자", Modifier.padding(start = 24.dp, top = 16.dp)) }) }
     }
 }
 

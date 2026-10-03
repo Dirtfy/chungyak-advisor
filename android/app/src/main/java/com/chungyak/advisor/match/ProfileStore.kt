@@ -34,6 +34,7 @@ class ProfileStore(context: Context) {
             .put("married", p.married).put("marriageYm", p.marriageYm).put("children", p.children)
             .put("hasNewborn", p.hasNewborn).put("supportsParent", p.supportsParent)
             .put("account", p.account.name).put("accountMonths", p.accountMonths)
+            .put("accountOpened", p.accountOpened)
             .put("payments", p.payments).put("depositManwon", p.depositManwon)
             .put("householdSize", p.householdSize).put("incomePct", p.incomePct)
             .put("dualIncome", p.dualIncome).put("realEstateManwon", p.realEstateManwon)
@@ -48,7 +49,7 @@ class ProfileStore(context: Context) {
             married = o.optBoolean("married"), marriageYm = o.optString("marriageYm"),
             children = o.optInt("children", 0), hasNewborn = o.optBoolean("hasNewborn"),
             supportsParent = o.optBoolean("supportsParent"), account = AccountType.of(o.optString("account")),
-            accountMonths = o.optInt("accountMonths", -1), payments = o.optInt("payments", -1),
+            accountMonths = o.optInt("accountMonths", -1), accountOpened = o.optString("accountOpened"), payments = o.optInt("payments", -1),
             depositManwon = o.optInt("depositManwon", -1), householdSize = o.optInt("householdSize", -1),
             incomePct = o.optInt("incomePct", -1), dualIncome = o.optBoolean("dualIncome"),
             realEstateManwon = o.optInt("realEstateManwon", -1), taxYears5 = o.optBoolean("taxYears5"),

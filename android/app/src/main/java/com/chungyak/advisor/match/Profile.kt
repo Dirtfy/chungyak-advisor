@@ -1,5 +1,7 @@
 package com.chungyak.advisor.match
 
+import java.time.LocalDate
+
 /** 청약통장 종류 — 신청 가능한 주택(국민/민영)이 다르다. */
 enum class AccountType(val label: String) {
     NONE("없음"),
@@ -47,7 +49,8 @@ data class Profile(
     val supportsParent: Boolean = false, // 만 65세 이상 직계존속 3년 이상 같은 등본 부양
     // 청약통장
     val account: AccountType = AccountType.NONE,
-    val accountMonths: Int = -1,        // 가입 기간(개월)
+    val accountOpened: String = "",     // 가입 일자 "yyyy-MM-dd" — 있으면 기간을 이 날짜로 계산(우선)
+    val accountMonths: Int = -1,        // 가입 기간(개월) 직접 입력 — 가입 일자가 없을 때 사용
     val payments: Int = -1,             // 납입 인정 회차(국민주택)
     val depositManwon: Int = -1,        // 예치금/납입 총액(만원)
     // 소득·자산
@@ -66,4 +69,10 @@ data class Profile(
     val isSet: Boolean get() = sido.isNotBlank()
 
     val homeless: Boolean get() = homesOwned == 0
+
+    /** [asOf] 기준 통장 가입 개월 수. 가입 일자가 있으면 그걸로 계산하고, 없으면 직접 입력값(-1 = 미입력). */
+    fun accountMonthsAt(asOf: LocalDate): Int {
+        val opened = AccountPeriod.parse(accountOpened) ?: return accountMonths
+        return AccountPeriod.months(opened, asOf).coerceAtLeast(0)
+    }
 }
