@@ -12,16 +12,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.chungyak.advisor.BuildConfig
 
 /** 새 릴리스 팝업. 상태가 Hidden이면 아무것도 그리지 않는다. */
 @Composable
 fun UpdateDialog(vm: UpdateViewModel = viewModel()) {
+    // 앱이 화면에 나올 때마다 확인(최근 앱에서 복귀해도). 간격 제한은 ViewModel이 건다.
+    val owner = LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_START) vm.onForeground() }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
     val state by vm.state.collectAsState()
     val s = state
     if (s is UpdateState.Hidden) return
@@ -59,11 +70,17 @@ fun UpdateDialog(vm: UpdateViewModel = viewModel()) {
                         else "설치 화면이 열리지 않았다면 [설치]를 다시 누르세요.",
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    is UpdateState.Failed -> Text(
-                        "업데이트를 받지 못했습니다: ${s.message}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                    is UpdateState.Failed -> {
+                        Text(
+                            "업데이트를 받지 못했습니다: ${s.message}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Text(
+                            "계속 안 되면 [웹에서 받기]로 APK를 직접 받아 설치하세요(데이터 유지).",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                     else -> {}
                 }
             }
@@ -79,7 +96,10 @@ fun UpdateDialog(vm: UpdateViewModel = viewModel()) {
                             TextButton(onClick = { vm.install(s.info) }) { Text("설치") }
                         }
                     } else TextButton(onClick = { vm.install(s.info) }) { Text("설치") }
-                is UpdateState.Failed -> TextButton(onClick = vm::update) { Text("다시 시도") }
+                is UpdateState.Failed -> Column {
+                    TextButton(onClick = vm::update) { Text("다시 시도") }
+                    TextButton(onClick = vm::openReleasePage) { Text("웹에서 받기") }
+                }
                 UpdateState.Hidden -> {}
             }
         },

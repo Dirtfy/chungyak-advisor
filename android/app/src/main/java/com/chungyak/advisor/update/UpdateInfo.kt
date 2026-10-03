@@ -7,6 +7,7 @@ data class UpdateInfo(
     val notes: String,        // 릴리스 노트 요약
     val apkUrl: String,       // .apk 에셋 browser_download_url
     val apkSize: Long,        // 바이트, 0 = 모름
+    val pageUrl: String = UpdateClient.RELEASES_PAGE, // 릴리스 웹 페이지(수동 다운로드용)
 )
 
 /** 버전 비교·노트 요약 — 순수 Kotlin(단위테스트 대상). */

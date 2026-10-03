@@ -17,6 +17,9 @@ object UpdateClient {
      */
     val REPOS = listOf("Dirtfy/chungyak-advisor", "Dirtfy/chungyak-advisor-releases")
 
+    /** 팝업 경로가 막혔을 때 브라우저로 직접 받는 곳. */
+    const val RELEASES_PAGE = "https://github.com/Dirtfy/chungyak-advisor/releases/latest"
+
     fun latest(): UpdateInfo? {
         for (repo in REPOS) {
             val json = runCatching { getJson("https://api.github.com/repos/$repo/releases/latest") }
@@ -39,6 +42,7 @@ object UpdateClient {
                     notes = Versions.summarize(j.optString("body").ifBlank { j.optString("name") }),
                     apkUrl = a.optString("browser_download_url"),
                     apkSize = a.optLong("size"),
+                    pageUrl = j.optString("html_url").ifBlank { RELEASES_PAGE },
                 )
             }
         }
@@ -47,6 +51,8 @@ object UpdateClient {
 
     /** [url]을 [dest]로 받으며 진행률(0..1, 크기 모르면 -1)을 알린다. 실패 시 예외. */
     fun download(url: String, expectedSize: Long, dest: File, onProgress: (Float) -> Unit) {
+        // cacheDir/updates는 새 설치 시 없다. v0.4.0~0.4.3은 이걸 만들지 않아 다운로드가 항상 ENOENT로 실패했다.
+        dest.parentFile?.mkdirs()
         val tmp = File(dest.parentFile, dest.name + ".part")
         val conn = open(url, 60_000)
         try {
@@ -65,8 +71,15 @@ object UpdateClient {
                     }
                 }
             }
+        } catch (e: Exception) {
+            tmp.delete()
+            throw e
         } finally {
             conn.disconnect()
+        }
+        if (tmp.length() == 0L || (expectedSize > 0 && tmp.length() != expectedSize)) {
+            tmp.delete()
+            error("파일 크기가 맞지 않습니다")
         }
         dest.delete()
         if (!tmp.renameTo(dest)) error("파일 저장 실패")

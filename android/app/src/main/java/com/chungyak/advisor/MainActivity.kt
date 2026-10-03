@@ -58,6 +58,7 @@ import com.chungyak.advisor.ui.PriceFormat
 import com.chungyak.advisor.ui.SortOrder
 import com.chungyak.advisor.ui.theme.ChungyakTheme
 import com.chungyak.advisor.update.UpdateDialog
+import com.chungyak.advisor.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -235,6 +236,17 @@ private fun SettingsCard(vm: NoticeViewModel, onSaved: () -> Unit) {
             )
             if (vm.backupMessage.isNotBlank()) {
                 Text(vm.backupMessage, style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.height(12.dp))
+            val uvm: UpdateViewModel = viewModel()
+            val updateMsg by uvm.message.collectAsState()
+            Text("앱 버전 v${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { uvm.check(manual = true) }) { Text("업데이트 확인") }
+                OutlinedButton(onClick = uvm::openReleasePage) { Text("웹에서 받기") }
+            }
+            if (updateMsg.isNotBlank()) {
+                Text(updateMsg, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
