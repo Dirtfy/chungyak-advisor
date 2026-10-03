@@ -35,15 +35,14 @@ object CompetitionParser {
 
     /**
      * CMPET_RATE → (n:1 값, 미달 여부). 청약홈은 미달을 "(△3)"처럼 부족 세대수로
-     * 표기하므로 그때는 접수/공급으로 계산. 숫자가 아니면("-", "") 접수/공급으로
-     * 계산할 수 있으면 계산, 아니면 0.
+     * 표기하므로 그때는 접수/공급으로 계산. "-"(또는 빈 값)는 경쟁률 미산정 —
+     * 해당지역에서 마감돼 기타지역·2순위는 집계하지 않는 경우라 (0, 미달 아님).
+     * 접수/공급으로 계산하면 기타지역 접수가 가짜 경쟁률이 된다(실응답 확인).
      */
     fun rate(text: String, units: Int, requests: Int): Pair<Double, Boolean> {
-        val computed = if (units > 0) requests.toDouble() / units else 0.0
-        if (text.contains('△')) return computed to true
-        val v = text.removeSuffix(":1").replace(",", "").trim().toDoubleOrNull()
-        val r = v ?: computed
-        return r to (units > 0 && requests < units)
+        if (text.contains('△')) return (if (units > 0) requests.toDouble() / units else 0.0) to true
+        val v = text.removeSuffix(":1").replace(",", "").trim().toDoubleOrNull() ?: return 0.0 to false
+        return v to (units > 0 && requests < units)
     }
 
     /**

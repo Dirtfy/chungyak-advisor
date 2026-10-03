@@ -33,8 +33,9 @@ class CompetitionParserTest {
         assertEquals("(△3)", c.rateText)
     }
 
-    @Test fun nonNumericRate_fallsBackToComputed() {
-        assertEquals(2.5 to false, CompetitionParser.rate("-", 4, 10))
+    @Test fun dashRate_isNotCounted() {
+        assertEquals(0.0 to false, CompetitionParser.rate("-", 28, 169))
+        assertEquals(0.0 to false, CompetitionParser.rate("-", 28, 0))
         assertEquals(0.0 to false, CompetitionParser.rate("", 0, 0))
         assertEquals(12.0 to false, CompetitionParser.rate("12:1", 1, 12))
     }
@@ -51,5 +52,30 @@ class CompetitionParserTest {
         assertEquals(4.0, avg, 1e-9) // (100+60)/(10+30)
         assertEquals(90.0, CompetitionParser.summary(listOf(other)).first, 1e-9)
         assertEquals(0.0 to 0.0, CompetitionParser.summary(emptyList()))
+    }
+
+    /** 실응답(2026-10-03, 숭의역 노르웨이숲 더 스카이 2026000448) 그대로. */
+    @Test fun realResponse_2026000448() {
+        val raw = listOf(
+            listOf("01", "069.7032 ", "1", "01", "해당지역", "7", "9", "1.29"),
+            listOf("01", "069.7032 ", "1", "02", "기타지역", "7", "2", "-"),
+            listOf("01", "069.7032 ", "2", "01", "해당지역", "7", "5", "-"),
+            listOf("01", "069.7032 ", "2", "02", "기타지역", "7", "10", "-"),
+            listOf("02", "084.9818 ", "1", "01", "해당지역", "22", "5", "(△17)"),
+            listOf("02", "084.9818 ", "1", "02", "기타지역", "22", "2", "(△15)"),
+            listOf("02", "084.9818 ", "2", "01", "해당지역", "22", "2", "(△13)"),
+            listOf("02", "084.9818 ", "2", "02", "기타지역", "22", "4", "(△9)"),
+        )
+        val keys = listOf("MODEL_NO", "HOUSE_TY", "SUBSCRPT_RANK_CODE", "RESIDE_SECD",
+            "RESIDE_SENM", "SUPLY_HSHLDCO", "REQ_CNT", "CMPET_RATE")
+        val rows = raw.map { v -> CompetitionParser.row("N1") { k -> v[keys.indexOf(k)] } }
+        assertEquals(1.29, rows[0].rate, 1e-9)
+        assertEquals(0.0, rows[3].rate, 1e-9) // "-" → 미산정 (10/7 아님)
+        assertFalse(rows[3].shortfall)
+        assertTrue(rows[4].shortfall)
+        assertEquals(5.0 / 22, rows[4].rate, 1e-9)
+        val (max, avg) = CompetitionParser.summary(rows)
+        assertEquals(1.29, max, 1e-9)
+        assertEquals(14.0 / 29, avg, 1e-9) // 1순위 해당지역: (9+5)/(7+22) → 미달 표시
     }
 }
