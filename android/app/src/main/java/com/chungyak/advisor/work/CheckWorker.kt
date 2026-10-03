@@ -11,6 +11,9 @@ import com.chungyak.advisor.data.AppDatabase
 import com.chungyak.advisor.data.CompetitionPolicy
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
+import com.chungyak.advisor.match.Eligibility
+import com.chungyak.advisor.match.NotifyMode
+import com.chungyak.advisor.match.ProfileStore
 import com.chungyak.advisor.notify.Notifier
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -62,18 +65,36 @@ class CheckWorker(
                 if (fresh.isNotEmpty()) {
                     dao.insertAll(if (baseline) fresh.map { it.copy(notified = true) } else fresh)
                 }
+                // 이미 있는 공고도 주택 구분·규제지역은 최신 값으로(v0.4.4 이하 수집분은 houseDtl이 비어 있음).
+                result.notices.filter { it.id in existing }.forEach {
+                    dao.updateMeta(it.id, it.houseDtl, it.speculationArea, it.adjustmentArea)
+                }
                 // 분양가는 목록에 없어 주택형별 상세를 공고별 2차 호출로 받아 캐시한다.
                 // 한 번 받으면 다시 부르지 않고, 실패분만 다음 폴링에서 재시도(쿼터·지연 절약).
                 val priced = cacheModels(settings.serviceKey)
                 // 경쟁률은 별도 서비스: 401이어도 다른 기능엔 영향 없이 안내만 남긴다.
                 val cmpet = cacheCompetition(settings)
+                var matchNote = ""
                 if (fresh.isNotEmpty() && !baseline) {
-                    Notifier.notifyNew(applicationContext, fresh.map { priced[it.id] ?: it })
+                    // 개인화: 프로필이 있으면 내 조건에 맞는 공고만 알린다(판정은 기기 안에서만).
+                    val store = ProfileStore(applicationContext)
+                    val profile = store.profile
+                    val mode = store.notifyMode
+                    val stored = dao.byIds(fresh.map { it.id }).associateBy { it.id }
+                    val models = AppDatabase.get(applicationContext).houseModelDao()
+                        .forNotices(fresh.map { it.id }).groupBy { it.noticeId }
+                    val candidates = fresh.map { stored[it.id] ?: priced[it.id] ?: it }
+                    val results = if (profile.isSet)
+                        candidates.associate { it.id to Eligibility.evaluate(profile, it, models[it.id].orEmpty()) }
+                    else emptyMap()
+                    val toNotify = candidates.filter { Eligibility.shouldNotify(profile, mode, results[it.id]) }
+                    Notifier.notifyNew(applicationContext, toNotify, results)
                     dao.markNotified(fresh.map { it.id })
+                    if (profile.isSet && mode != NotifyMode.ALL) matchNote = " · 맞춤 알림 ${toNotify.size}건"
                 }
                 settings.lastResult =
                     "$stamp · 조회 ${result.notices.size}건 · 신규 ${fresh.size}건" +
-                        (if (baseline && fresh.isNotEmpty()) "(첫 수집: 알림 생략)" else "") +
+                        (if (baseline && fresh.isNotEmpty()) "(첫 수집: 알림 생략)" else "") + matchNote +
                         (if (priced.isNotEmpty()) " · 분양가 ${priced.size}건" else "") +
                         when {
                             settings.cmpetUnauthorized -> " · 경쟁률: data.go.kr 활용신청 필요"

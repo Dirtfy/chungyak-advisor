@@ -1,0 +1,366 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "9b11a4690a21bb2d835570ce326aa439",
+    "entities": [
+      {
+        "tableName": "notices",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `houseManageNo` TEXT NOT NULL, `pblancNo` TEXT NOT NULL, `name` TEXT NOT NULL, `areaName` TEXT NOT NULL, `address` TEXT NOT NULL, `totalUnits` INTEGER NOT NULL, `noticeDate` TEXT NOT NULL, `rank1Start` TEXT NOT NULL, `rank1End` TEXT NOT NULL, `resultDate` TEXT NOT NULL, `houseKind` TEXT NOT NULL, `speculationArea` INTEGER NOT NULL, `adjustmentArea` INTEGER NOT NULL, `url` TEXT NOT NULL, `homepage` TEXT NOT NULL, `priceMinManwon` INTEGER NOT NULL, `priceMaxManwon` INTEGER NOT NULL, `modelsFetchedAt` INTEGER NOT NULL, `cmpetMaxRate` REAL NOT NULL, `cmpetAvgRate` REAL NOT NULL, `cmpetFetchedAt` INTEGER NOT NULL, `cmpetFinal` INTEGER NOT NULL, `houseDtl` TEXT NOT NULL, `firstSeen` INTEGER NOT NULL, `notified` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "houseManageNo",
+            "columnName": "houseManageNo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pblancNo",
+            "columnName": "pblancNo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "areaName",
+            "columnName": "areaName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalUnits",
+            "columnName": "totalUnits",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "noticeDate",
+            "columnName": "noticeDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rank1Start",
+            "columnName": "rank1Start",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rank1End",
+            "columnName": "rank1End",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resultDate",
+            "columnName": "resultDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "houseKind",
+            "columnName": "houseKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "speculationArea",
+            "columnName": "speculationArea",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "adjustmentArea",
+            "columnName": "adjustmentArea",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "homepage",
+            "columnName": "homepage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priceMinManwon",
+            "columnName": "priceMinManwon",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priceMaxManwon",
+            "columnName": "priceMaxManwon",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelsFetchedAt",
+            "columnName": "modelsFetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cmpetMaxRate",
+            "columnName": "cmpetMaxRate",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cmpetAvgRate",
+            "columnName": "cmpetAvgRate",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cmpetFetchedAt",
+            "columnName": "cmpetFetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cmpetFinal",
+            "columnName": "cmpetFinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "houseDtl",
+            "columnName": "houseDtl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstSeen",
+            "columnName": "firstSeen",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notified",
+            "columnName": "notified",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "house_models",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`noticeId` TEXT NOT NULL, `modelNo` TEXT NOT NULL, `houseType` TEXT NOT NULL, `supplyArea` REAL NOT NULL, `units` INTEGER NOT NULL, `priceManwon` INTEGER NOT NULL, `spTotal` INTEGER NOT NULL, `spMultiChild` INTEGER NOT NULL, `spNewlywed` INTEGER NOT NULL, `spFirstLife` INTEGER NOT NULL, `spOldParent` INTEGER NOT NULL, `spInstitution` INTEGER NOT NULL, `spNewborn` INTEGER NOT NULL, `spYouth` INTEGER NOT NULL, PRIMARY KEY(`noticeId`, `modelNo`))",
+        "fields": [
+          {
+            "fieldPath": "noticeId",
+            "columnName": "noticeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelNo",
+            "columnName": "modelNo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "houseType",
+            "columnName": "houseType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supplyArea",
+            "columnName": "supplyArea",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "units",
+            "columnName": "units",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priceManwon",
+            "columnName": "priceManwon",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spTotal",
+            "columnName": "spTotal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spMultiChild",
+            "columnName": "spMultiChild",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spNewlywed",
+            "columnName": "spNewlywed",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spFirstLife",
+            "columnName": "spFirstLife",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spOldParent",
+            "columnName": "spOldParent",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spInstitution",
+            "columnName": "spInstitution",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spNewborn",
+            "columnName": "spNewborn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spYouth",
+            "columnName": "spYouth",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "noticeId",
+            "modelNo"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "competitions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`noticeId` TEXT NOT NULL, `modelNo` TEXT NOT NULL, `houseType` TEXT NOT NULL, `rank` INTEGER NOT NULL, `resideCode` TEXT NOT NULL, `resideName` TEXT NOT NULL, `units` INTEGER NOT NULL, `requests` INTEGER NOT NULL, `rate` REAL NOT NULL, `rateText` TEXT NOT NULL, `shortfall` INTEGER NOT NULL, PRIMARY KEY(`noticeId`, `modelNo`, `rank`, `resideCode`))",
+        "fields": [
+          {
+            "fieldPath": "noticeId",
+            "columnName": "noticeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelNo",
+            "columnName": "modelNo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "houseType",
+            "columnName": "houseType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rank",
+            "columnName": "rank",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resideCode",
+            "columnName": "resideCode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resideName",
+            "columnName": "resideName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "units",
+            "columnName": "units",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requests",
+            "columnName": "requests",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rate",
+            "columnName": "rate",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rateText",
+            "columnName": "rateText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "shortfall",
+            "columnName": "shortfall",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "noticeId",
+            "modelNo",
+            "rank",
+            "resideCode"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9b11a4690a21bb2d835570ce326aa439')"
+    ]
+  }
+}

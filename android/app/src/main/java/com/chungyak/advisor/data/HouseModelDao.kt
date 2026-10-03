@@ -18,6 +18,13 @@ interface HouseModelDao {
     @Query("SELECT * FROM house_models")
     suspend fun all(): List<HouseModel>
 
+    /** 목록 매칭 표시용: 전체 주택형(공고 수 × 주택형 수 — 수백 행 수준). */
+    @Query("SELECT * FROM house_models")
+    fun observeAll(): Flow<List<HouseModel>>
+
+    @Query("SELECT * FROM house_models WHERE noticeId IN (:ids)")
+    suspend fun forNotices(ids: List<String>): List<HouseModel>
+
     @Query("DELETE FROM house_models")
     suspend fun clear()
 }

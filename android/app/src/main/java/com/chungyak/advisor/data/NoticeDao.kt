@@ -44,6 +44,13 @@ interface NoticeDao {
     @Query("SELECT * FROM notices")
     suspend fun all(): List<Notice>
 
+    /** 재폴링 때 바뀔 수 있는 공고 속성(주택 구분·규제지역) 갱신. 알림 여부 등은 건드리지 않는다. */
+    @Query("UPDATE notices SET houseDtl = :houseDtl, speculationArea = :spec, adjustmentArea = :adj WHERE id = :id")
+    suspend fun updateMeta(id: String, houseDtl: String, spec: Boolean, adj: Boolean)
+
+    @Query("SELECT * FROM notices WHERE id IN (:ids)")
+    suspend fun byIds(ids: List<String>): List<Notice>
+
     /** 백업 가져오기: 같은 id는 백업 값으로 교체(알림 여부 포함). */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(notices: List<Notice>)

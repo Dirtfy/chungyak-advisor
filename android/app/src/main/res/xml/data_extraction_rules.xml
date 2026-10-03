@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ 클라우드 백업·기기 간 이전: 청약 프로필(개인정보)은 제외. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="chungyak_profile.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="chungyak_profile.xml" />
+    </device-transfer>
+</data-extraction-rules>

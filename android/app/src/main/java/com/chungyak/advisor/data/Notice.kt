@@ -37,6 +37,8 @@ data class Notice(
     // 경쟁률을 마지막으로 받은 시각(0 = 아직) / 확정 여부(true면 더 이상 재조회 안 함).
     val cmpetFetchedAt: Long = 0,
     val cmpetFinal: Boolean = false,
+    // HOUSE_DTL_SECD_NM 주택상세구분: "민영" / "국민". "" = 미확인(v0.4.4 이하에서 수집) → 다음 폴링에서 채움.
+    val houseDtl: String = "",
     val firstSeen: Long,         // epoch millis this row was first collected
     val notified: Boolean,       // whether a local notification was already posted
 )

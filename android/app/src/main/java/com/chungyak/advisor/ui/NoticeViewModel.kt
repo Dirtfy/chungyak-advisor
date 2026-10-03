@@ -11,8 +11,14 @@ import com.chungyak.advisor.data.Competition
 import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
+import com.chungyak.advisor.match.Eligibility
+import com.chungyak.advisor.match.NotifyMode
+import com.chungyak.advisor.match.Profile
+import com.chungyak.advisor.match.ProfileStore
 import com.chungyak.advisor.work.Scheduler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +42,36 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
     val notices: StateFlow<List<Notice>> =
         combine(dao.observeAll(), _sort) { list, order -> NoticeSort.sort(list, order, today()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // ---- 개인화(내 조건) — 프로필은 기기 안에만 저장 ----
+    private val profileStore = ProfileStore(app)
+    private val _profile = MutableStateFlow(profileStore.profile)
+    val profile: StateFlow<Profile> = _profile
+    var notifyMode by mutableStateOf(profileStore.notifyMode)
+        private set
+
+    /** 공고별 매칭 결과. 프로필이 없으면 비어 있다. */
+    val matches: StateFlow<Map<String, Eligibility.Result>> =
+        combine(dao.observeAll(), db.houseModelDao().observeAll(), _profile) { list, models, p ->
+            if (!p.isSet) emptyMap() else {
+                val byNotice = models.groupBy { it.noticeId }
+                list.associate { it.id to Eligibility.evaluate(p, it, byNotice[it.id].orEmpty()) }
+            }
+        }.flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    fun saveProfile(p: Profile, mode: NotifyMode) {
+        profileStore.profile = p
+        profileStore.notifyMode = mode
+        _profile.value = p
+        notifyMode = mode
+    }
+
+    fun clearProfile() {
+        profileStore.clear()
+        _profile.value = Profile()
+        notifyMode = profileStore.notifyMode
+    }
 
     fun setSort(order: SortOrder) {
         settings.sortOrder = order.name

@@ -115,6 +115,14 @@ object ApplyHomeClient {
                             supplyArea = r.optString("SUPLY_AR").trim().toDoubleOrNull() ?: 0.0,
                             units = manwon(r.optString("SUPLY_HSHLDCO")) ?: 0,
                             priceManwon = manwon(r.optString("LTTOT_TOP_AMOUNT")) ?: 0,
+                            spTotal = count(r, "SPSPLY_HSHLDCO"),
+                            spMultiChild = count(r, "MNYCH_HSHLDCO"),
+                            spNewlywed = count(r, "NWWDS_HSHLDCO"),
+                            spFirstLife = count(r, "LFE_FRST_HSHLDCO"),
+                            spOldParent = count(r, "OLD_PARNTS_SUPORT_HSHLDCO"),
+                            spInstitution = count(r, "INSTT_RECOMEND_HSHLDCO"),
+                            spNewborn = count(r, "NWBB_HSHLDCO"),
+                            spYouth = count(r, "YGMN_HSHLDCO"),
                         )
                     )
                 }
@@ -209,6 +217,17 @@ object ApplyHomeClient {
         return if (digits.isEmpty()) null else digits.toIntOrNull()
     }
 
+    private fun count(r: JSONObject, field: String): Int = manwon(r.optString(field)) ?: 0
+
+    /**
+     * MDAT_TRGET_AREA_SECD: 명세상 Y(과열지역)/N(미대상). 예전 코드값(1·2 = 대상, 3 = 미대상)도 받는다.
+     * v0.4.4 이하는 "N"도 대상으로 읽었다(목록 표시에만 쓰여 드러나지 않았음).
+     */
+    internal fun adjustment(v: String): Boolean {
+        val t = v.trim().uppercase()
+        return t.isNotEmpty() && t != "N" && t != "3"
+    }
+
     private fun matchesRegion(row: JSONObject, regions: Set<String>): Boolean {
         val area = row.optString("SUBSCRPT_AREA_CODE_NM")
         val addr = row.optString("HSSPLY_ADRES")
@@ -231,9 +250,11 @@ object ApplyHomeClient {
             rank1End = iso(r.optString("GNRL_RNK1_CRSPAREA_ENDDE")),
             resultDate = iso(r.optString("PRZWNER_PRESNATN_DE")),
             houseKind = r.optString("HOUSE_SECD_NM").ifBlank { r.optString("HOUSE_DTL_SECD_NM") },
-            speculationArea = r.optString("SPECLT_RDN_EARTH_AT") == "Y",
-            adjustmentArea = r.optString("MDAT_TRGET_AREA_SECD").isNotBlank() &&
-                r.optString("MDAT_TRGET_AREA_SECD") != "3",
+            speculationArea = r.optString("SPECLT_RDN_EARTH_AT").trim().uppercase() == "Y",
+            adjustmentArea = adjustment(r.optString("MDAT_TRGET_AREA_SECD")),
+            houseDtl = r.optString("HOUSE_DTL_SECD_NM").trim().ifBlank {
+                when (r.optString("HOUSE_DTL_SECD").trim()) { "01" -> "민영"; "03" -> "국민"; else -> "" }
+            },
             url = r.optString("PBLANC_URL"),
             homepage = r.optString("HMPG_ADRES"),
             firstSeen = System.currentTimeMillis(),

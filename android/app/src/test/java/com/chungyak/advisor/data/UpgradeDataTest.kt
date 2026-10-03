@@ -89,9 +89,33 @@ class UpgradeDataTest {
         val n = db.noticeDao().all().single()
         assertEquals(87700, n.priceMinManwon)
         assertEquals(119800, n.priceMaxManwon)
-        assertEquals(5L, n.modelsFetchedAt)
+        assertEquals(0L, n.modelsFetchedAt) // v5: 특공 세대수를 받으려고 주택형을 다시 받는다(가격은 유지)
         assertEquals(87900, db.houseModelDao().all().single().priceManwon)
         assertEquals(0.0, n.cmpetMaxRate, 0.0)
+        db.close()
+    }
+
+    @Test fun v4_app030to044_upgradesTo5_keepsDataAndRefetchesModels() = runBlocking {
+        createOld(4, listOf(v1Notices)) { db ->
+            insertV1(db, "a", 1); insertV1(db, "b", 0)
+            AppDatabase.MIGRATION_1_2.migrate(db); AppDatabase.MIGRATION_2_3.migrate(db); AppDatabase.MIGRATION_3_4.migrate(db)
+            db.execSQL("UPDATE notices SET priceMinManwon=87700, priceMaxManwon=119800, modelsFetchedAt=5, cmpetMaxRate=12.5, cmpetFinal=1")
+            db.execSQL("INSERT INTO house_models VALUES ('a','01','059.9742A',78.5038,10,87900)")
+            db.execSQL("INSERT INTO competitions VALUES ('a','01','059.9742A',1,'01','해당지역',10,125,12.5,'12.50',0)")
+        }
+        val db = openCurrent()
+        val rows = db.noticeDao().all().sortedBy { it.id }
+        assertEquals(listOf(true, false), rows.map { it.notified })
+        assertEquals(119800, rows[0].priceMaxManwon)
+        assertEquals(12.5, rows[0].cmpetMaxRate, 0.0)
+        assertTrue(rows[0].cmpetFinal)
+        assertEquals("", rows[0].houseDtl)
+        assertEquals(0L, rows[0].modelsFetchedAt)
+        val m = db.houseModelDao().all().single()
+        assertEquals(87900, m.priceManwon)
+        assertEquals(0, m.spNewlywed)
+        assertEquals(59.9742, m.exclusiveArea, 1e-9)
+        assertEquals(125, db.competitionDao().all().single().requests)
         db.close()
     }
 

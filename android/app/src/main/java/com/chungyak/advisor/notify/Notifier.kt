@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.chungyak.advisor.MainActivity
 import com.chungyak.advisor.R
 import com.chungyak.advisor.data.Notice
+import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.ui.PriceFormat
 
 /**
@@ -68,15 +69,19 @@ object Notifier {
             .setContentIntent(intent)
 
     /** 밴드 화면용 짧은 제목: 단지명이 길면 자른다. */
-    fun shortTitle(name: String, max: Int = 18): String =
-        "신규 청약 " + (if (name.length > max) name.take(max - 1) + "…" else name)
+    fun shortTitle(name: String, max: Int = 18, prefix: String = "신규 청약 "): String =
+        prefix + (if (name.length > max) name.take(max - 1) + "…" else name)
 
     /**
      * Notify about [newNotices]. One notification per 공고 (up to a small cap),
      * plus a summary line. Safe to call when the POST_NOTIFICATIONS permission
      * is absent — it simply no-ops.
      */
-    fun notifyNew(context: Context, newNotices: List<Notice>) {
+    fun notifyNew(
+        context: Context,
+        newNotices: List<Notice>,
+        matches: Map<String, Eligibility.Result> = emptyMap(),
+    ) {
         if (newNotices.isEmpty()) return
         ensureChannel(context)
         val nm = NotificationManagerCompat.from(context)
@@ -95,12 +100,14 @@ object Notifier {
             val price = if (n.priceMaxManwon > 0)
                 " · 분양가 ${PriceFormat.range(n.priceMinManwon, n.priceMaxManwon)}" else ""
             // 밴드에는 제목+본문 한 줄이 보인다. 상세(주소·세대수·분양가)는 폰의 펼친 알림에.
+            val m = matches[n.id]
+            val mine = m?.let { "\n내 조건: ${it.verdict.label} — ${it.summary}" }.orEmpty()
             val notif = base(context, contentIntent)
-                .setContentTitle(shortTitle(n.name))
+                .setContentTitle(if (m != null) shortTitle(n.name, prefix = "맞춤 청약 ") else shortTitle(n.name))
                 .setContentText("${n.areaName} · $schedule")
                 .setStyle(
                     NotificationCompat.BigTextStyle().bigText(
-                        "${n.name}\n${n.areaName} ${n.address}\n${n.totalUnits}세대 · $schedule$price"
+                        "${n.name}\n${n.areaName} ${n.address}\n${n.totalUnits}세대 · $schedule$price$mine"
                     )
                 )
                 .build()

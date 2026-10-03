@@ -83,6 +83,7 @@ object Backup {
         .put("modelsFetchedAt", n.modelsFetchedAt).put("cmpetMaxRate", n.cmpetMaxRate)
         .put("cmpetAvgRate", n.cmpetAvgRate).put("cmpetFetchedAt", n.cmpetFetchedAt)
         .put("cmpetFinal", n.cmpetFinal).put("firstSeen", n.firstSeen).put("notified", n.notified)
+        .put("houseDtl", n.houseDtl)
 
     private fun notice(o: JSONObject) = Notice(
         id = o.getString("id"), houseManageNo = o.optString("houseManageNo"),
@@ -97,17 +98,24 @@ object Backup {
         modelsFetchedAt = o.optLong("modelsFetchedAt"), cmpetMaxRate = o.optDouble("cmpetMaxRate", 0.0),
         cmpetAvgRate = o.optDouble("cmpetAvgRate", 0.0), cmpetFetchedAt = o.optLong("cmpetFetchedAt"),
         cmpetFinal = o.optBoolean("cmpetFinal"), firstSeen = o.optLong("firstSeen"),
-        notified = o.optBoolean("notified", true),
+        notified = o.optBoolean("notified", true), houseDtl = o.optString("houseDtl"),
     )
 
     private fun modelJson(m: HouseModel) = JSONObject()
         .put("noticeId", m.noticeId).put("modelNo", m.modelNo).put("houseType", m.houseType)
         .put("supplyArea", m.supplyArea).put("units", m.units).put("priceManwon", m.priceManwon)
+        .put("spTotal", m.spTotal).put("spMultiChild", m.spMultiChild).put("spNewlywed", m.spNewlywed)
+        .put("spFirstLife", m.spFirstLife).put("spOldParent", m.spOldParent)
+        .put("spInstitution", m.spInstitution).put("spNewborn", m.spNewborn).put("spYouth", m.spYouth)
 
     private fun model(o: JSONObject) = HouseModel(
         noticeId = o.getString("noticeId"), modelNo = o.getString("modelNo"),
         houseType = o.optString("houseType"), supplyArea = o.optDouble("supplyArea", 0.0),
         units = o.optInt("units"), priceManwon = o.optInt("priceManwon"),
+        spTotal = o.optInt("spTotal"), spMultiChild = o.optInt("spMultiChild"),
+        spNewlywed = o.optInt("spNewlywed"), spFirstLife = o.optInt("spFirstLife"),
+        spOldParent = o.optInt("spOldParent"), spInstitution = o.optInt("spInstitution"),
+        spNewborn = o.optInt("spNewborn"), spYouth = o.optInt("spYouth"),
     )
 
     private fun cmpetJson(c: Competition) = JSONObject()

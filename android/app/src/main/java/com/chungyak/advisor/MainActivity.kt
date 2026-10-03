@@ -52,7 +52,9 @@ import com.chungyak.advisor.data.Competition
 import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
+import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.ui.CompetitionFormat
+import com.chungyak.advisor.ui.ProfileScreen
 import com.chungyak.advisor.ui.NoticeViewModel
 import com.chungyak.advisor.ui.PriceFormat
 import com.chungyak.advisor.ui.SortOrder
@@ -93,10 +95,23 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     var showSettings by remember { mutableStateOf(!vm.hasKey) }
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = notices.firstOrNull { it.id == selectedId }
+    val profile by vm.profile.collectAsState()
+    val matches by vm.matches.collectAsState()
+    var showProfile by remember { mutableStateOf(false) }
+    var onlyMatched by remember { mutableStateOf(false) }
 
+    if (showProfile) {
+        ProfileScreen(
+            initial = profile, initialMode = vm.notifyMode,
+            onSave = { p, m -> vm.saveProfile(p, m); showProfile = false },
+            onClear = { vm.clearProfile(); showProfile = false },
+            onBack = { showProfile = false },
+        )
+        return
+    }
     if (selected != null) {
         BackHandler { selectedId = null }
-        NoticeDetailScreen(selected, vm, onBack = { selectedId = null })
+        NoticeDetailScreen(selected, vm, matches[selected.id], onBack = { selectedId = null })
         return
     }
 
@@ -105,6 +120,7 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
             TopAppBar(
                 title = { Text("청약 레이더 · 수도권 일반공급") },
                 actions = {
+                    TextButton(onClick = { showProfile = true }) { Text("내 조건") }
                     TextButton(onClick = { showSettings = !showSettings }) {
                         Text(if (showSettings) "닫기" else "설정")
                     }
@@ -126,10 +142,22 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
             }
 
             Spacer(Modifier.height(12.dp))
+            val shown = if (onlyMatched && profile.isSet)
+                notices.filter { matches[it.id]?.verdict != Eligibility.Verdict.INELIGIBLE } else notices
             Text(
-                "수집된 공고 ${notices.size}건",
+                if (profile.isSet) "수집된 공고 ${notices.size}건 · 내 조건에 맞음 " +
+                    "${notices.count { matches[it.id]?.verdict == Eligibility.Verdict.ELIGIBLE }}건"
+                else "수집된 공고 ${notices.size}건",
                 style = MaterialTheme.typography.titleMedium,
             )
+            if (profile.isSet) {
+                FilterChip(
+                    selected = onlyMatched, onClick = { onlyMatched = !onlyMatched },
+                    label = { Text("가능·확인 필요만 보기") },
+                )
+            } else {
+                TextButton(onClick = { showProfile = true }) { Text("내 조건을 입력하면 맞는 공고만 알려 드려요 〉") }
+            }
             SortBar(sort, vm::setSort)
             Spacer(Modifier.height(4.dp))
 
@@ -143,8 +171,8 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
                 )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(notices, key = { it.id }) {
-                        NoticeRow(it, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized)) { selectedId = it.id }
+                    items(shown, key = { it.id }) {
+                        NoticeRow(it, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized), matches[it.id]) { selectedId = it.id }
                     }
                 }
             }
@@ -253,13 +281,14 @@ private fun SettingsCard(vm: NoticeViewModel, onSaved: () -> Unit) {
 }
 
 @Composable
-private fun NoticeRow(n: Notice, cmpet: String, onClick: () -> Unit) {
+private fun NoticeRow(n: Notice, cmpet: String, match: Eligibility.Result?, onClick: () -> Unit) {
     Card(
         Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(),
     ) {
         Column(Modifier.padding(14.dp)) {
             Text(n.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (match != null) MatchLine(match)
             Spacer(Modifier.height(4.dp))
             Text("${n.areaName} · ${n.address}", style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(4.dp))
@@ -295,7 +324,7 @@ private fun priceSummary(n: Notice): String =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, onBack: () -> Unit) {
+private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibility.Result?, onBack: () -> Unit) {
     val models by remember(n.id) { vm.models(n.id) }.collectAsState(initial = emptyList())
     val cmpets by remember(n.id) { vm.competitions(n.id) }.collectAsState(initial = emptyList())
     val cmpetSummary = CompetitionFormat.summary(n, vm.today(), vm.cmpetUnauthorized)
@@ -324,6 +353,10 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, onBack: () -> Uni
                     " · 발표 ${n.resultDate}",
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (match != null) {
+                Spacer(Modifier.height(12.dp))
+                MatchCard(match)
+            }
             Spacer(Modifier.height(12.dp))
             Text("분양가 ${priceSummary(n)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -460,4 +493,56 @@ private fun androidx.compose.foundation.layout.RowScope.Cell(
         textAlign = if (end) TextAlign.End else TextAlign.Start,
         modifier = Modifier.weight(weight).padding(end = 4.dp),
     )
+}
+
+@Composable
+private fun verdictColor(v: Eligibility.Verdict) = when (v) {
+    Eligibility.Verdict.ELIGIBLE -> MaterialTheme.colorScheme.primary
+    Eligibility.Verdict.CHECK -> MaterialTheme.colorScheme.tertiary
+    Eligibility.Verdict.INELIGIBLE -> MaterialTheme.colorScheme.outline
+}
+
+/** 목록: 내 조건 판정 한 줄. */
+@Composable
+private fun MatchLine(m: Eligibility.Result) {
+    Text(
+        "내 조건: ${m.verdict.label} · ${m.summary}",
+        style = MaterialTheme.typography.labelMedium,
+        color = verdictColor(m.verdict),
+        fontWeight = FontWeight.Medium,
+        maxLines = 1,
+    )
+}
+
+/** 상세: 유형별 판정과 근거. */
+@Composable
+private fun MatchCard(m: Eligibility.Result) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                "내 조건 판정: ${m.verdict.label}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = verdictColor(m.verdict),
+            )
+            m.filteredOut?.let { Text("관심 조건 제외: $it", style = MaterialTheme.typography.bodySmall) }
+            if (m.notes.isNotEmpty()) Text(m.notes.joinToString(" · "), style = MaterialTheme.typography.labelSmall)
+            // 가능 → 확인 필요 → 불가 순.
+            m.tracks.sortedByDescending { it.verdict.rank }.forEach { t ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "${t.name} — ${t.verdict.label}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = verdictColor(t.verdict),
+                )
+                t.reasons.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "기관추천·청년·이전기관 특공은 판정하지 않습니다. 기준: ${Eligibility.RULES_SOURCE} " +
+                    "(${Eligibility.RULES_DATE}). 참고용 — 최종 자격은 모집공고문·청약홈에서 확인.",
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
 }
