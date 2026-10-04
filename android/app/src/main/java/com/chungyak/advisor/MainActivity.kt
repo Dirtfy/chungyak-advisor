@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -416,78 +416,153 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibilit
             )
         },
     ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            Spacer(Modifier.height(4.dp))
-            DetailSummaryCard(n, vm.today(), cmpetSummary)
-            Spacer(Modifier.height(12.dp))
-            LocationCard(n.name, n.address)
-            if (match != null) {
-                Spacer(Modifier.height(12.dp))
-                MatchCard(match)
-            }
-            Spacer(Modifier.height(12.dp))
-            Text("분양가 ${priceSummary(n)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
+        NoticeDetailBody(
+            n, vm.today(), cmpetSummary, models, cmpets, match,
+            modifier = Modifier.fillMaxSize().padding(padding),
+            onOpenNotice = { runCatching { uri.openUri(n.url) } },
+            location = { LocationCard(n.name, n.address) },
+        )
+    }
+}
 
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text("주택형별 분양가 (최고가 기준)", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(8.dp))
-                    if (models.isEmpty()) {
-                        Text(
-                            if (n.modelsFetchedAt == 0L) "주택형별 정보를 아직 받지 못했습니다. '지금 확인' 후 다시 열어보세요."
-                            else PriceFormat.NONE,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    } else {
-                        ModelHeader()
-                        models.forEach { ModelRow(it) }
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text("경쟁률 $cmpetSummary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text("주택형별 경쟁률 (일반공급)", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(8.dp))
-                    if (cmpets.isEmpty()) {
-                        Text(
-                            when (cmpetSummary) {
-                                CompetitionFormat.BEFORE -> "접수 전입니다. 접수가 시작되면 경쟁률을 받아옵니다."
-                                CompetitionFormat.NEED_APPLY ->
-                                    "경쟁률은 별도 공공데이터 서비스입니다. data.go.kr에서 " +
-                                        "'한국부동산원_청약홈 청약접수 경쟁률 및 특별공급 신청현황 조회 서비스'(15098905) 활용신청 후 같은 키로 자동 표시됩니다."
-                                CompetitionFormat.PENDING -> "접수 결과 집계 중입니다. 다음 확인 때 다시 받아옵니다."
-                                else -> CompetitionFormat.NONE
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    } else {
-                        CmpetHeader()
-                        cmpets.forEach { CmpetRow(it) }
-                    }
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "· 분양가: 청약홈 주택형별 공급금액(분양최고금액). 평당가 = 분양가 ÷ 공급면적(평, 1평=3.3058㎡).\n" +
-                    "· 세대수: 일반공급 기준. 옵션·발코니 확장비 제외 — 정확한 금액은 모집공고문 확인.\n" +
-                    "· 경쟁률: 청약홈 접수 결과(목록 값은 1순위 해당지역 기준, 평균 = 접수 합 ÷ 공급 합). △ = 미달 세대수.",
-                style = MaterialTheme.typography.labelSmall,
+/**
+ * 상세 본문(리디자인 2단계, docs/11): 요약 → 위치 → 내 조건 판정 → 분양가 → 경쟁률, 모두 같은 폭의 흰 카드.
+ * 스크롤 상태와 위치 카드는 밖에서 받는다 — 테스트가 여러 스크롤 위치에서 지도 겹침을 검사한다.
+ */
+@Composable
+internal fun NoticeDetailBody(
+    n: Notice,
+    today: String,
+    cmpetSummary: String,
+    models: List<HouseModel>,
+    cmpets: List<Competition>,
+    match: Eligibility.Result?,
+    modifier: Modifier = Modifier,
+    scroll: ScrollState = rememberScrollState(),
+    onOpenNotice: () -> Unit = {},
+    location: @Composable () -> Unit,
+) {
+    Column(
+        modifier.padding(horizontal = 16.dp).verticalScroll(scroll),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Spacer(Modifier.height(0.dp))
+        DetailSummaryCard(n, today, cmpetSummary)
+        location()
+        if (match != null) MatchCard(match)
+        PriceCard(n, models)
+        CompetitionCard(cmpetSummary, cmpets)
+        Text(
+            "· 분양가: 청약홈 주택형별 공급금액(분양최고금액). 평당가 = 분양가 ÷ 공급면적(평, 1평=3.3058㎡).\n" +
+                "· 세대수: 일반공급 기준. 옵션·발코니 확장비 제외 — 정확한 금액은 모집공고문 확인.\n" +
+                "· 경쟁률: 청약홈 접수 결과(목록 값은 1순위 해당지역 기준, 평균 = 접수 합 ÷ 공급 합). △ = 미달 세대수.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        if (n.url.isNotBlank()) {
+            Button(onClick = onOpenNotice, modifier = Modifier.fillMaxWidth()) { Text("청약홈 공고 열기") }
+        }
+        Spacer(Modifier.height(4.dp))
+    }
+}
+
+/** 상세 화면의 흰 카드 틀: 굵은 제목, 강조 값, 그 아래 내용. */
+@Composable
+private fun SectionCard(title: String, value: String? = null, content: @Composable () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            // 값이 길 수 있어(경쟁률 "최고 … · 평균 …") 제목 옆이 아니라 다음 줄에 둔다.
+            if (value != null) Text(value, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(6.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun Caption(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun PriceCard(n: Notice, models: List<HouseModel>) {
+    SectionCard("분양가", priceSummary(n)) {
+        if (models.isEmpty()) {
+            Caption(
+                if (n.modelsFetchedAt == 0L) "주택형별 정보를 아직 받지 못했습니다. '지금 확인' 후 다시 열어보세요."
+                else PriceFormat.NONE,
             )
-            if (n.url.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = { runCatching { uri.openUri(n.url) } }) { Text("청약홈 공고 열기") }
+        } else {
+            Caption("주택형별 · 최고가 기준")
+            models.forEachIndexed { i, m ->
+                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ModelRow(m)
             }
-            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** 주택형 한 줄: 왼쪽 주택형·면적·세대, 오른쪽 분양가·평당가. */
+@Composable
+private fun ModelRow(m: HouseModel) {
+    val perPyeong = PriceFormat.perPyeongManwon(m.priceManwon, m.supplyArea)
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(m.houseType.ifBlank { "-" }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Caption("공급 ${PriceFormat.area(m.supplyArea)} · ${m.units}세대")
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(PriceFormat.full(m.priceManwon), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            if (perPyeong > 0) Caption("평당 ${PriceFormat.full(perPyeong)}")
+        }
+    }
+}
+
+@Composable
+private fun CompetitionCard(cmpetSummary: String, cmpets: List<Competition>) {
+    SectionCard("경쟁률", cmpetSummary) {
+        if (cmpets.isEmpty()) {
+            Caption(
+                when (cmpetSummary) {
+                    CompetitionFormat.BEFORE -> "접수 전입니다. 접수가 시작되면 경쟁률을 받아옵니다."
+                    CompetitionFormat.NEED_APPLY ->
+                        "경쟁률은 별도 공공데이터 서비스입니다. data.go.kr에서 " +
+                            "'한국부동산원_청약홈 청약접수 경쟁률 및 특별공급 신청현황 조회 서비스'(15098905) 활용신청 후 같은 키로 자동 표시됩니다."
+                    CompetitionFormat.PENDING -> "접수 결과 집계 중입니다. 다음 확인 때 다시 받아옵니다."
+                    else -> CompetitionFormat.NONE
+                },
+            )
+        } else {
+            Caption("주택형별 · 일반공급")
+            cmpets.forEachIndexed { i, c ->
+                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                CmpetRow(c)
+            }
+        }
+    }
+}
+
+/** 경쟁률 한 줄: 왼쪽 주택형·순위·지역, 오른쪽 경쟁률(미달은 주황)·접수/공급. */
+@Composable
+private fun CmpetRow(c: Competition) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(c.houseType.ifBlank { "-" }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Caption("${c.rank}순위 ${c.resideName.ifBlank { c.resideCode }}")
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                c.rateText.ifBlank { CompetitionFormat.rate(c.rate) },
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (c.shortfall) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+            )
+            Caption("접수 ${"%,d".format(c.requests)} / 공급 ${c.units}")
         }
     }
 }
@@ -532,83 +607,6 @@ private fun ScheduleLine(label: String, value: String) {
 }
 
 @Composable
-private fun ModelHeader() {
-    Row(Modifier.fillMaxWidth()) {
-        Cell("주택형", 1.1f, bold = true)
-        Cell("공급면적", 1.3f, bold = true)
-        Cell("세대", 0.5f, bold = true, end = true)
-        Cell("분양가", 1.3f, bold = true, end = true)
-    }
-    HorizontalDivider(Modifier.padding(vertical = 4.dp))
-}
-
-@Composable
-private fun ModelRow(m: HouseModel) {
-    val perPyeong = PriceFormat.perPyeongManwon(m.priceManwon, m.supplyArea)
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-        Cell(m.houseType.ifBlank { "-" }, 1.1f)
-        Cell(PriceFormat.area(m.supplyArea), 1.3f)
-        Cell("${m.units}", 0.5f, end = true)
-        Column(Modifier.weight(1.3f)) {
-            Text(
-                PriceFormat.full(m.priceManwon),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.End,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (perPyeong > 0) {
-                Text(
-                    "평당 ${PriceFormat.full(perPyeong)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CmpetHeader() {
-    Row(Modifier.fillMaxWidth()) {
-        Cell("주택형", 1.1f, bold = true)
-        Cell("순위·지역", 1.1f, bold = true)
-        Cell("공급", 0.5f, bold = true, end = true)
-        Cell("접수", 0.7f, bold = true, end = true)
-        Cell("경쟁률", 0.9f, bold = true, end = true)
-    }
-    HorizontalDivider(Modifier.padding(vertical = 4.dp))
-}
-
-@Composable
-private fun CmpetRow(c: Competition) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-        Cell(c.houseType.ifBlank { "-" }, 1.1f)
-        Cell("${c.rank}순위 ${c.resideName.ifBlank { c.resideCode }}", 1.1f)
-        Cell("${c.units}", 0.5f, end = true)
-        Cell("%,d".format(c.requests), 0.7f, end = true)
-        Cell(c.rateText.ifBlank { CompetitionFormat.rate(c.rate) }, 0.9f, end = true)
-    }
-}
-
-@Composable
-private fun androidx.compose.foundation.layout.RowScope.Cell(
-    text: String,
-    weight: Float,
-    bold: Boolean = false,
-    end: Boolean = false,
-) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodySmall,
-        fontWeight = if (bold) FontWeight.Bold else null,
-        textAlign = if (end) TextAlign.End else TextAlign.Start,
-        modifier = Modifier.weight(weight).padding(end = 4.dp),
-    )
-}
-
-@Composable
 private fun verdictColor(v: Eligibility.Verdict) = when (v) {
     Eligibility.Verdict.ELIGIBLE -> MaterialTheme.colorScheme.primary
     Eligibility.Verdict.CHECK -> MaterialTheme.colorScheme.tertiary
@@ -631,35 +629,57 @@ private fun MatchLine(m: Eligibility.Result) {
     )
 }
 
-/** 상세: 유형별 판정과 근거. */
+/** 상세: 유형별 판정과 근거. 판정은 색 배지, 근거는 그 아래 목록. */
 @Composable
 private fun MatchCard(m: Eligibility.Result) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
-            Text(
-                "내 조건 판정: ${m.verdict.label}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = verdictColor(m.verdict),
-            )
-            m.filteredOut?.let { Text("관심 조건 제외: $it", style = MaterialTheme.typography.bodySmall) }
-            if (m.notes.isNotEmpty()) Text(m.notes.joinToString(" · "), style = MaterialTheme.typography.labelSmall)
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("내 조건 판정", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                VerdictPill(m.verdict)
+            }
+            m.filteredOut?.let {
+                Spacer(Modifier.height(4.dp))
+                Text("관심 조건 제외: $it", style = MaterialTheme.typography.bodySmall)
+            }
+            if (m.notes.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Caption(m.notes.joinToString(" · "))
+            }
             // 가능 → 확인 필요 → 불가 순.
             m.tracks.sortedByDescending { it.verdict.rank }.forEach { t ->
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "${t.name} — ${t.verdict.label}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = verdictColor(t.verdict),
-                )
-                t.reasons.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(verdictColor(t.verdict).copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(t.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                        VerdictPill(t.verdict)
+                    }
+                    if (t.reasons.isNotEmpty()) Spacer(Modifier.height(4.dp))
+                    t.reasons.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
                 "기관추천·청년·이전기관 특공은 판정하지 않습니다. 기준: ${Eligibility.RULES_SOURCE} " +
                     "(${Eligibility.RULES_DATE}). 참고용 — 최종 자격은 모집공고문·청약홈에서 확인.",
                 style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
+}
+
+@Composable
+private fun VerdictPill(v: Eligibility.Verdict) {
+    val c = verdictColor(v)
+    // 불가(회색)는 옅은 바탕 위 글자가 흐려서 글자만 진한 보조색으로.
+    Pill(v.label, c.copy(alpha = 0.14f), if (v == Eligibility.Verdict.INELIGIBLE) MaterialTheme.colorScheme.onSurfaceVariant else c)
 }

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -93,11 +94,19 @@ internal fun LocationCardContent(
     onRetry: () -> Unit,
     map: @Composable (GeoPoint) -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
-            Text("위치", style = MaterialTheme.typography.titleSmall)
-            Text(address, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag(TAG_ADDRESS))
-            Spacer(Modifier.height(8.dp))
+    Card(
+        Modifier.fillMaxWidth().testTag(TAG_CARD),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+    ) {
+        Column(Modifier.padding(CARD_PADDING)) {
+            Text("위치", style = MaterialTheme.typography.titleMedium)
+            Text(
+                address,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(TAG_ADDRESS),
+            )
+            Spacer(Modifier.height(10.dp))
             val note = when {
                 !online -> "오프라인이라 지도를 불러올 수 없습니다. 연결되면 [다시 시도]를 누르세요."
                 state == null -> "위치를 찾는 중…"
@@ -112,7 +121,7 @@ internal fun LocationCardContent(
                     Modifier
                         .fillMaxWidth()
                         .height(MAP_HEIGHT)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .testTag(TAG_MAP),
                 ) {
                     map(state.point)
@@ -131,12 +140,17 @@ internal fun LocationCardContent(
                             .testTag(TAG_ATTRIBUTION),
                     )
                 }
-                if (note != null) Spacer(Modifier.height(6.dp))
+                if (note != null) Spacer(Modifier.height(8.dp))
             }
             if (note != null) {
-                Text(note, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag(TAG_NOTE))
+                Text(
+                    note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(TAG_NOTE),
+                )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             FlowRow(
                 Modifier.fillMaxWidth().testTag(TAG_BUTTONS),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -151,6 +165,8 @@ internal fun LocationCardContent(
 }
 
 internal val MAP_HEIGHT = 200.dp
+internal val CARD_PADDING = 18.dp
+internal const val TAG_CARD = "loc_card"
 internal const val TAG_ADDRESS = "loc_address"
 internal const val TAG_MAP = "loc_map"
 internal const val TAG_ATTRIBUTION = "loc_attribution"

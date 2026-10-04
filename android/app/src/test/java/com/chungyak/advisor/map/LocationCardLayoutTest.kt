@@ -109,6 +109,9 @@ class LocationCardLayoutTest {
             if (exists(TAG_RETRY)) assertNoOverlap(open, bounds(TAG_RETRY), "$tag open/retry")
             if (hasMap) {
                 val map = bounds(TAG_MAP)
+                // 지도 폭은 어느 공고든 카드 안쪽 폭과 같다(v0.6.0 캡처에선 카드마다 달랐음).
+                val inner = bounds(TAG_CARD).width - 2 * CARD_PADDING.value * rule.activity.resources.displayMetrics.density
+                assertTrue("$tag map width ${map.width} = card inner $inner", kotlin.math.abs(map.width - inner) < 1f)
                 assertNoOverlap(map, bounds(TAG_ADDRESS), "$tag map/address")
                 assertNoOverlap(map, bounds(TAG_BUTTONS), "$tag map/buttons")
                 assertNoOverlap(map, open, "$tag map/open")
@@ -181,7 +184,7 @@ class LocationCardLayoutTest {
 
 /** 지도 대역: overflow면 osmdroid 가장자리 타일처럼 자기 영역 밖(위아래 300px)까지 빨갛게 칠한다. */
 @Composable
-private fun FakeMap(overflow: Boolean) {
+internal fun FakeMap(overflow: Boolean) {
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { ctx: Context ->
