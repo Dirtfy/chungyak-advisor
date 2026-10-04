@@ -8,9 +8,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,7 +46,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +62,7 @@ import com.chungyak.advisor.map.LocationCard
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.ui.CompetitionFormat
 import com.chungyak.advisor.ui.ProfileScreen
+import com.chungyak.advisor.ui.ScheduleBadge
 import com.chungyak.advisor.ui.NoticeViewModel
 import com.chungyak.advisor.ui.PriceFormat
 import com.chungyak.advisor.ui.SortOrder
@@ -175,9 +182,9 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(shown, key = { it.id }) {
-                        NoticeRow(it, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized), matches[it.id]) { selectedId = it.id }
+                        NoticeRow(it, today, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized), matches[it.id]) { selectedId = it.id }
                     }
                 }
             }
@@ -319,40 +326,72 @@ private fun SettingsCard(vm: NoticeViewModel, onSaved: () -> Unit) {
     }
 }
 
+/** 목록 카드(리디자인, docs/11): 지역·규제·일정 배지 → 단지명 → 주소 → 핵심 숫자 3칸 → 내 조건 판정. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NoticeRow(n: Notice, cmpet: String, match: Eligibility.Result?, onClick: () -> Unit) {
+internal fun NoticeRow(n: Notice, today: String, cmpet: String, match: Eligibility.Result?, onClick: () -> Unit) {
     Card(
         Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
     ) {
-        Column(Modifier.padding(14.dp)) {
-            Text(n.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            if (match != null) MatchLine(match)
-            Spacer(Modifier.height(4.dp))
-            Text("${n.areaName} · ${n.address}", style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.height(4.dp))
-            val schedule = if (n.rank1Start.isNotBlank())
-                "1순위 접수 ${n.rank1Start}" else "모집공고 ${n.noticeDate}"
-            Text(
-                "${n.totalUnits}세대 · $schedule · 발표 ${n.resultDate}",
-                style = MaterialTheme.typography.bodySmall,
-            )
+        Column(Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Pill(n.areaName, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+                    if (n.speculationArea) Pill("투기과열", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
+                    if (n.adjustmentArea) Pill("조정대상", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
+                }
+                ScheduleBadge.of(n, today)?.let { b ->
+                    val (bg, fg) = when (b.tone) {
+                        ScheduleBadge.Tone.OPEN -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+                        ScheduleBadge.Tone.UPCOMING -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Pill(b.text, bg, fg)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(n.name, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(2.dp))
+            Text(n.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Stat("세대", if (n.totalUnits > 0) "${n.totalUnits}" else "-", Modifier.weight(0.7f))
+                Stat("분양가", priceSummary(n), Modifier.weight(1.3f))
+                Stat("경쟁률", cmpet, Modifier.weight(1.3f))
+            }
+            Spacer(Modifier.height(10.dp))
+            val schedule = if (n.rank1Start.isNotBlank()) "1순위 ${n.rank1Start}" else "모집공고 ${n.noticeDate}"
             Text(
-                "분양가 ${priceSummary(n)}",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
+                "$schedule · 발표 ${n.resultDate.ifBlank { "-" }}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text("경쟁률 $cmpet", style = MaterialTheme.typography.bodySmall)
-            if (n.speculationArea || n.adjustmentArea) {
-                Spacer(Modifier.height(2.dp))
-                val tags = buildList {
-                    if (n.speculationArea) add("투기과열지구")
-                    if (n.adjustmentArea) add("조정대상지역")
-                }.joinToString(" · ")
-                Text(tags, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            if (match != null) {
+                Spacer(Modifier.height(10.dp))
+                MatchLine(match)
             }
         }
+    }
+}
+
+@Composable
+private fun Pill(text: String, bg: Color, fg: Color) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = fg,
+        maxLines = 1,
+        modifier = Modifier.background(bg, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
+    )
+}
+
+@Composable
+private fun Stat(label: String, value: String, modifier: Modifier) {
+    Column(modifier.padding(end = 6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 2)
     }
 }
 
@@ -384,14 +423,8 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibilit
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Text("${n.areaName} · ${n.address}", style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(4.dp))
-            Text(
-                "${n.totalUnits}세대 · 모집공고 ${n.noticeDate}" +
-                    (if (n.rank1Start.isNotBlank()) " · 1순위 ${n.rank1Start}~${n.rank1End}" else "") +
-                    " · 발표 ${n.resultDate}",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            DetailSummaryCard(n, vm.today(), cmpetSummary)
             Spacer(Modifier.height(12.dp))
             LocationCard(n.name, n.address)
             if (match != null) {
@@ -456,6 +489,45 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibilit
             }
             Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+/** 상세 상단 요약(리디자인, docs/11): 배지 · 단지명 · 주소 · 핵심 숫자 · 일정. */
+@Composable
+internal fun DetailSummaryCard(n: Notice, today: String, cmpet: String) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Pill(n.areaName, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+                ScheduleBadge.of(n, today)?.let { Pill(it.text, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary) }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(n.name, style = MaterialTheme.typography.titleLarge)
+            Text(n.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Stat("세대", if (n.totalUnits > 0) "${n.totalUnits}" else "-", Modifier.weight(0.7f))
+                Stat("분양가", priceSummary(n), Modifier.weight(1.3f))
+                Stat("경쟁률", cmpet, Modifier.weight(1.3f))
+            }
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(8.dp))
+            ScheduleLine("모집공고", n.noticeDate)
+            if (n.rank1Start.isNotBlank()) ScheduleLine("1순위 접수", "${n.rank1Start} ~ ${n.rank1End}")
+            ScheduleLine("당첨자 발표", n.resultDate)
+        }
+    }
+}
+
+@Composable
+private fun ScheduleLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(value.ifBlank { "-" }, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -550,8 +622,12 @@ private fun MatchLine(m: Eligibility.Result) {
         "내 조건: ${m.verdict.label} · ${m.summary}",
         style = MaterialTheme.typography.labelMedium,
         color = verdictColor(m.verdict),
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.SemiBold,
         maxLines = 1,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(verdictColor(m.verdict).copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
     )
 }
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 상세 지도 마커(브랜드 파랑). osmdroid 기본 마커 대체. 아래 끝점이 좌표. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="42dp"
+    android:viewportWidth="32"
+    android:viewportHeight="42">
+    <path
+        android:fillColor="#2F6BFF"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M16,41C16,41 2,25.5 2,15.5A14,14 0,0 1,30 15.5C30,25.5 16,41 16,41Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,15.5m-5.5,0a5.5,5.5 0,1 1,11 0a5.5,5.5 0,1 1,-11 0" />
+</vector>

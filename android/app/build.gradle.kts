@@ -8,7 +8,7 @@ plugins {
 }
 
 // 앱 버전. versionCode는 여기서 계산(major*10000 + minor*100 + patch) → 릴리스마다 단조 증가.
-val appVersion = "0.6.0"
+val appVersion = "0.6.1"
 val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
 
 // 고정 서명 키: 저장소 밖(../../signing)에 영속 보관, 절대 커밋 금지.
@@ -116,5 +116,8 @@ dependencies {
     // 업데이트 시 데이터 보존 검증(실제 Room 마이그레이션·백업 코드를 JVM에서 실행).
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("androidx.test:core-ktx:1.6.1")
+    // 화면 배치 검증(겹침 검사·스크린샷)을 Robolectric 위 Compose 테스트로.
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 
 }
