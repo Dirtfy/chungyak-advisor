@@ -52,6 +52,7 @@ import com.chungyak.advisor.data.Competition
 import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
+import com.chungyak.advisor.map.LocationCard
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.ui.CompetitionFormat
 import com.chungyak.advisor.ui.ProfileScreen
@@ -134,6 +135,10 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
                 .padding(padding)
                 .padding(horizontal = 16.dp),
         ) {
+            if (!vm.hasKey && !showSettings) {
+                KeyMissingCard { showSettings = true }
+                Spacer(Modifier.height(12.dp))
+            }
             StatusCard(status = status, onCheck = { vm.checkNow(); vm.refreshStatus() })
 
             if (showSettings) {
@@ -180,6 +185,39 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     }
 }
 
+/** 서비스키 미입력 안내. 키는 각자 data.go.kr에서 받아 넣는다(앱·저장소에 내장하지 않음). */
+@Composable
+private fun KeyMissingCard(onOpenSettings: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("서비스키를 입력하세요", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "공고를 받으려면 본인의 공공데이터포털(data.go.kr) 서비스키가 필요합니다. 키는 이 폰에만 저장됩니다.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            KeyGuide()
+            Button(onClick = onOpenSettings) { Text("설정에서 입력하기") }
+        }
+    }
+}
+
+/** data.go.kr 서비스키 발급 방법(두 서비스 활용신청). */
+@Composable
+private fun KeyGuide() {
+    val uri = LocalUriHandler.current
+    Text(
+        "발급: data.go.kr 회원가입 → 아래 두 서비스에서 [활용신청](자동 승인) → 마이페이지의 '일반 인증키(Decoding)'를 복사해 붙여넣기. " +
+            "신청 후 반영까지 최대 1시간 걸릴 수 있습니다.",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    TextButton(onClick = { uri.openUri("https://www.data.go.kr/data/15098547/openapi.do") }) {
+        Text("① 청약홈 분양정보 조회 서비스 (15098547)")
+    }
+    TextButton(onClick = { uri.openUri("https://www.data.go.kr/data/15098905/openapi.do") }) {
+        Text("② 청약접수 경쟁률 조회 서비스 (15098905, 경쟁률용)")
+    }
+}
+
 @Composable
 private fun SortBar(selected: SortOrder, onSelect: (SortOrder) -> Unit) {
     Row(
@@ -220,6 +258,7 @@ private fun SettingsCard(vm: NoticeViewModel, onSaved: () -> Unit) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            KeyGuide()
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = vm.lookbackDays,
@@ -353,6 +392,8 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibilit
                     " · 발표 ${n.resultDate}",
                 style = MaterialTheme.typography.bodySmall,
             )
+            Spacer(Modifier.height(12.dp))
+            LocationCard(n.name, n.address)
             if (match != null) {
                 Spacer(Modifier.height(12.dp))
                 MatchCard(match)

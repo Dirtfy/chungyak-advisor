@@ -97,10 +97,13 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
     var lookbackDays by mutableStateOf(settings.lookbackDays.toString())
     var regions by mutableStateOf(settings.regions)
 
-    val hasKey: Boolean get() = settings.hasKey
+    /** 저장된 서비스키가 있는가(화면 갱신용 상태). 키는 사용자가 입력한 값뿐 — 앱에 내장된 기본값은 없다. */
+    var hasKey by mutableStateOf(settings.hasKey)
+        private set
 
     fun saveSettings() {
         settings.serviceKey = serviceKey
+        hasKey = settings.hasKey
         settings.lookbackDays = lookbackDays.toIntOrNull()?.coerceIn(1, 365) ?: 30
         settings.regions = regions
     }
@@ -145,6 +148,7 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val r = com.chungyak.advisor.data.Backup.import(app, text)
                 serviceKey = settings.serviceKey
+                hasKey = settings.hasKey
                 lookbackDays = settings.lookbackDays.toString()
                 regions = settings.regions
                 _sort.value = SortOrder.of(settings.sortOrder)

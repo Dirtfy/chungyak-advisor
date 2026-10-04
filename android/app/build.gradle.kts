@@ -8,7 +8,7 @@ plugins {
 }
 
 // 앱 버전. versionCode는 여기서 계산(major*10000 + minor*100 + patch) → 릴리스마다 단조 증가.
-val appVersion = "0.5.1"
+val appVersion = "0.6.0"
 val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
 
 // 고정 서명 키: 저장소 밖(../../signing)에 영속 보관, 절대 커밋 금지.
@@ -106,6 +106,9 @@ dependencies {
 
     // WorkManager — periodic background polling of the 청약홈 API.
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // 상세 화면 위치 지도 — OpenStreetMap 타일(API 키 불필요).
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

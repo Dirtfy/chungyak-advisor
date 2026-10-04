@@ -11,3 +11,4 @@ handoff.txt
 .gradle-home/
 android/build.log
 dist/
+__pycache__/
