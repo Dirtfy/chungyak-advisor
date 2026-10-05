@@ -14,7 +14,17 @@ val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (a, b, c) ->
 // 고정 서명 키: 저장소 밖(../../signing)에 영속 보관, 절대 커밋 금지.
 // 빌드마다 새로 생기는 디버그 키로 서명하면 덮어쓰기 업데이트가 실패하므로 모든 빌드를 이 키로 서명.
 // 다른 위치면 CHUNGYAK_SIGNING_PROPS=<경로>/keystore.properties 로 지정.
-val signingProps = (System.getenv("CHUNGYAK_SIGNING_PROPS")?.let(::File)
+// CI(GitHub Actions 릴리스 job)는 파일 대신 환경변수 ANDROID_KEYSTORE_PATH·ANDROID_KEYSTORE_PASSWORD·
+// ANDROID_KEY_ALIAS·ANDROID_KEY_PASSWORD로 같은 키를 넘긴다. 둘 다 없으면 서명 설정 없이 빌드(release는 미서명).
+val envKeystore = System.getenv("ANDROID_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }?.let(::File)
+val signingProps = if (envKeystore != null) {
+    Properties().apply {
+        setProperty("storeFile", envKeystore.name) // 아래에서 parentFile 기준으로 푼다
+        setProperty("storePassword", System.getenv("ANDROID_KEYSTORE_PASSWORD"))
+        setProperty("keyAlias", System.getenv("ANDROID_KEY_ALIAS"))
+        setProperty("keyPassword", System.getenv("ANDROID_KEY_PASSWORD"))
+    } to envKeystore.parentFile
+} else (System.getenv("CHUNGYAK_SIGNING_PROPS")?.let(::File)
     ?: rootProject.file("../../signing/keystore.properties"))
     .takeIf { it.isFile }
     ?.let { f -> Properties().apply { f.inputStream().use(::load) } to f.parentFile }
