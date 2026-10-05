@@ -47,6 +47,16 @@ cd android
 - `applicationId`: `com.chungyak.advisor` · `minSdk` 26(Android 8.0) · `targetSdk` 34
 - Gradle 8.9, AGP 8.5.2, Kotlin 2.0.20, Compose BOM 2024.09.02
 
+### CI / 릴리스 (GitHub Actions)
+
+- `.github/workflows/ci.yml`: PR·main 푸시 → 단위 테스트 + 디버그 APK. 서명·Secrets 없음.
+- `.github/workflows/release.yml`: `v*` 태그 푸시 → 고정 키로 서명한 release APK를 같은 태그의 Release에
+  `chungyak-radar-vX.Y.Z.apk`로 첨부. 태그와 `appVersion`(app/build.gradle.kts)이 다르면 실패한다(인앱 업데이트가 태그를 버전으로 읽음).
+- 서명: `ANDROID_KEYSTORE_PATH`·`ANDROID_KEYSTORE_PASSWORD`·`ANDROID_KEY_ALIAS`·`ANDROID_KEY_PASSWORD` 환경변수
+  (CI는 Secrets `ANDROID_KEYSTORE_BASE64` 등에서 복원). 없으면 저장소 밖 `keystore.properties`, 그것도 없으면 미서명.
+  서명 인증서 SHA-256 `e169d6eb…3c61ed` — 바뀌면 기존 설치본 위에 업데이트가 안 된다. 확인: `tools/apk_cert_sha256.py <apk>`.
+- 릴리스 절차: `appVersion` 올려 커밋·푸시 → `git tag -a vX.Y.Z` → `git push origin vX.Y.Z`.
+
 ## 면책
 
 본 앱은 참고용 정보 제공 도구다. 청약 자격·일정의 최종 확인은 반드시 청약홈 공고문과
