@@ -108,6 +108,16 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
         settings.regions = regions
     }
 
+    /** 청약 일정 알림 켜기/끄기 — 바로 저장하고 예약도 맞춘다. */
+    var scheduleAlerts by mutableStateOf(settings.scheduleAlerts)
+        private set
+
+    fun updateScheduleAlerts(on: Boolean) {
+        settings.scheduleAlerts = on
+        scheduleAlerts = on
+        Scheduler.scheduleAlerts(getApplication(), on)
+    }
+
     fun toggleRegion(region: String) {
         regions = if (region in regions) regions - region else regions + region
     }
@@ -151,6 +161,8 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
                 hasKey = settings.hasKey
                 lookbackDays = settings.lookbackDays.toString()
                 regions = settings.regions
+                scheduleAlerts = settings.scheduleAlerts
+                Scheduler.scheduleAlerts(app, settings.scheduleAlerts)
                 _sort.value = SortOrder.of(settings.sortOrder)
                 "가져오기 완료: 공고 ${r.notices}건, 주택형 ${r.models}건, 경쟁률 ${r.competitions}건 + 설정"
             }.getOrElse { "가져오기 실패: ${it.message}" }

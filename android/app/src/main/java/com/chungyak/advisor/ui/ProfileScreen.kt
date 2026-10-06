@@ -47,15 +47,25 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-/** 내 청약 조건 입력 화면. 저장 값은 기기 안(ProfileStore)에만 남는다. */
+/**
+ * 내 청약 조건 입력 화면(하단 '내 조건' 탭). 저장 값은 기기 안(ProfileStore)에만 남는다.
+ * [onBack]이 있으면 닫기 버튼을 보여 준다(탭 안에서는 없음 — 뒤로 가기는 탭 화면이 처리).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(initial: Profile, initialMode: NotifyMode, onSave: (Profile, NotifyMode) -> Unit, onClear: () -> Unit, onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
-    var p by remember { mutableStateOf(initial) }
-    var mode by remember { mutableStateOf(initialMode) }
+fun ProfileScreen(
+    initial: Profile,
+    initialMode: NotifyMode,
+    onSave: (Profile, NotifyMode) -> Unit,
+    onClear: () -> Unit,
+    onBack: (() -> Unit)? = null,
+) {
+    if (onBack != null) BackHandler(onBack = onBack)
+    // 저장·지우기로 프로필이 바뀌면 입력칸도 새 값으로.
+    var p by remember(initial) { mutableStateOf(initial) }
+    var mode by remember(initialMode) { mutableStateOf(initialMode) }
     // 숫자 입력칸은 문자열로 들고 있다가 저장 때 변환(빈칸 = 미입력 -1).
-    val nums = remember {
+    val nums = remember(initial) {
         mutableStateOf(
             mapOf(
                 "residenceMonths" to initial.residenceMonths, "homesOwned" to initial.homesOwned,
@@ -94,7 +104,7 @@ fun ProfileScreen(initial: Profile, initialMode: NotifyMode, onSave: (Profile, N
         topBar = {
             TopAppBar(
                 title = { Text("내 청약 조건") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("〈 닫기") } },
+                navigationIcon = { if (onBack != null) TextButton(onClick = onBack) { Text("〈 닫기") } },
             )
         },
     ) { padding ->

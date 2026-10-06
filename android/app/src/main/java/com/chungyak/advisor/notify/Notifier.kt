@@ -73,6 +73,38 @@ object Notifier {
         prefix + (if (name.length > max) name.take(max - 1) + "…" else name)
 
     /**
+     * 청약 일정 알림([ScheduleAlerts]): 공고·일정마다 한 건. 새 공고 알림과 같은 채널·형태라 밴드에도
+     * 그대로 전달된다. 제목은 "내일 접수 단지명…" 처럼 밴드 화면에 맞게 짧게.
+     */
+    fun notifySchedule(context: Context, alerts: List<ScheduleAlerts.Alert>) {
+        if (alerts.isEmpty()) return
+        ensureChannel(context)
+        val nm = NotificationManagerCompat.from(context)
+        if (!nm.areNotificationsEnabled()) return
+        val contentIntent = PendingIntent.getActivity(
+            context, 0,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        alerts.take(10).forEach { a ->
+            val n = a.notice
+            val day = if (a.tomorrow) "내일" else "오늘"
+            val what = "$day(${a.date}) ${a.kind.label}"
+            val notif = base(context, contentIntent)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setContentTitle(shortTitle(n.name, prefix = a.prefix))
+                .setContentText("${n.areaName} · $what")
+                .setStyle(NotificationCompat.BigTextStyle().bigText("${n.name}\n${n.areaName} ${n.address}\n$what"))
+                .build()
+            try {
+                nm.notify(a.key.hashCode(), notif)
+            } catch (_: SecurityException) {
+            }
+        }
+    }
+
+    /**
      * Notify about [newNotices]. One notification per 공고 (up to a small cap),
      * plus a summary line. Safe to call when the POST_NOTIFICATIONS permission
      * is absent — it simply no-ops.

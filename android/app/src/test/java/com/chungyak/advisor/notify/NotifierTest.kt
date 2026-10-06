@@ -66,4 +66,17 @@ class NotifierTest {
         assertEquals(6, posted.size)
         assertTrue(posted.all { it.channelId == Notifier.CHANNEL_NEW && !NotificationCompat.getLocalOnly(it) })
     }
+
+    @Test fun scheduleAlert_sameMirrorableChannel_shortTitle() {
+        val n = notice("S", rank1Start = "2026-10-07").copy(name = "아주아주긴단지이름이있는신규분양아파트단지테스트")
+        val a = ScheduleAlerts.due(listOf(n), java.time.LocalDate.parse("2026-10-06"), 19, emptySet()).single()
+        Notifier.notifySchedule(ctx, listOf(a))
+        val posted = shadowOf(mgr).allNotifications.single()
+        assertEquals(Notifier.CHANNEL_NEW, posted.channelId)
+        assertFalse(NotificationCompat.getLocalOnly(posted))
+        assertEquals(NotificationCompat.CATEGORY_REMINDER, posted.category)
+        val title = posted.extras.getString(Notification.EXTRA_TITLE)!!
+        assertTrue(title, title.startsWith("내일 접수 ") && title.endsWith("…"))
+        assertEquals("경기 · 내일(2026-10-07) 1순위 접수", posted.extras.getString(Notification.EXTRA_TEXT))
+    }
 }

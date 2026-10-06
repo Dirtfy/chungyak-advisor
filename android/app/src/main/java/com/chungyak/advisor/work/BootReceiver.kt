@@ -9,6 +9,7 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             Scheduler.schedulePeriodic(context)
+            Scheduler.scheduleAlerts(context, com.chungyak.advisor.data.Settings(context).scheduleAlerts)
         }
     }
 }

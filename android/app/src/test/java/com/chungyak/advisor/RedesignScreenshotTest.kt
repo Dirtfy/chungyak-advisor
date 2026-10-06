@@ -15,6 +15,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Inbox
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.ui.theme.ChungyakTheme
 import org.junit.Rule
@@ -70,5 +72,17 @@ class RedesignScreenshotTest {
 
     @Test fun detailSummary() = shot("redesign_detail_summary_360dp_x1.0.png", 1.0f) {
         DetailSummaryCard(a, "2026-10-04", "접수 전")
+    }
+
+    @Test fun emptyStates() = shot("redesign_empty_360dp_x1.0.png", 1.0f) {
+        com.chungyak.advisor.ui.EmptyState(
+            androidx.compose.material.icons.Icons.Outlined.Inbox, "아직 수집된 공고가 없어요",
+            "위의 새로고침(지금 확인)을 누르면 바로 조회합니다.", action = "지금 확인",
+        )
+        com.chungyak.advisor.ui.EmptyState(
+            androidx.compose.material.icons.Icons.Outlined.ErrorOutline, "확인 중 오류",
+            "네트워크 상태를 확인하세요.",
+            tint = MaterialTheme.colorScheme.error, container = MaterialTheme.colorScheme.errorContainer,
+        )
     }
 }

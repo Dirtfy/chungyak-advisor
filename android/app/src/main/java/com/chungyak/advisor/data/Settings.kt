@@ -52,6 +52,16 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_BASELINE, false)
         set(v) = prefs.edit().putBoolean(KEY_BASELINE, v).apply()
 
+    /** 청약 일정 알림(접수 시작일·당첨 발표일) 켜짐 여부. 기본 켬(v0.7.0~). */
+    var scheduleAlerts: Boolean
+        get() = prefs.getBoolean(KEY_SCHEDULE_ALERTS, true)
+        set(v) = prefs.edit().putBoolean(KEY_SCHEDULE_ALERTS, v).apply()
+
+    /** 이미 보낸 일정 알림 키(ScheduleAlerts.key). 중복 알림 방지. */
+    var scheduleSent: Set<String>
+        get() = prefs.getStringSet(KEY_SCHEDULE_SENT, emptySet())?.toSet() ?: emptySet()
+        set(v) = prefs.edit().putStringSet(KEY_SCHEDULE_SENT, HashSet(v)).apply()
+
     /**
      * 설정 스키마 마이그레이션. 키 이름/형식을 바꿀 때는 [PREFS_VERSION]을 올리고 아래에 단계를
      * 추가한다(기존 단계는 지우지 않는다). 앱 시작 시 1회 호출. 업데이트 시 설정 보존이 목적.
@@ -80,6 +90,8 @@ class Settings(context: Context) {
         private const val KEY_LAST_RESULT = "last_result"
         private const val KEY_SORT = "sort_order"
         private const val KEY_CMPET_UNAUTH = "cmpet_unauthorized"
+        private const val KEY_SCHEDULE_ALERTS = "schedule_alerts"
+        private const val KEY_SCHEDULE_SENT = "schedule_sent"
 
         /** 수도권 default: Seoul, Gyeonggi, Incheon. */
         val DEFAULT_REGIONS = setOf("서울", "경기", "인천")

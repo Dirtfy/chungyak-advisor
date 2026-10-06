@@ -92,6 +92,8 @@ class CheckWorker(
                     dao.markNotified(fresh.map { it.id })
                     if (profile.isSet && mode != NotifyMode.ALL) matchNote = " · 맞춤 알림 ${toNotify.size}건"
                 }
+                // 새로 받은 공고의 오늘·내일 일정도 바로 확인(1시간 주기 확인을 기다리지 않음).
+                runCatching { ScheduleAlertWorker.runAlerts(applicationContext, settings) }
                 settings.lastResult =
                     "$stamp · 조회 ${result.notices.size}건 · 신규 ${fresh.size}건" +
                         (if (baseline && fresh.isNotEmpty()) "(첫 수집: 알림 생략)" else "") + matchNote +

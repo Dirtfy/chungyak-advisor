@@ -32,6 +32,7 @@ object Backup {
                     .put("lookbackDays", s.lookbackDays)
                     .put("regions", JSONArray(s.regions.sorted()))
                     .put("sortOrder", s.sortOrder)
+                    .put("scheduleAlerts", s.scheduleAlerts)
             )
             .put("notices", JSONArray(db.noticeDao().all().map(::noticeJson)))
             .put("houseModels", JSONArray(db.houseModelDao().all().map(::modelJson)))
@@ -63,6 +64,7 @@ object Backup {
                 s.regions = (0 until a.length()).map { a.getString(it) }.toSet()
             }
             st.optString("sortOrder").takeIf { it.isNotBlank() }?.let { s.sortOrder = it }
+            if (st.has("scheduleAlerts")) s.scheduleAlerts = st.optBoolean("scheduleAlerts", true)
             // 공고를 옮겨왔으니 다음 수집에서 이미 본 공고를 다시 알리지 않는다.
             if (notices.isNotEmpty()) s.baselineDone = true
         }

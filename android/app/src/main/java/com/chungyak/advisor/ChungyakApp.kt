@@ -13,5 +13,6 @@ class ChungyakApp : Application() {
         Notifier.ensureChannel(this)
         // Idempotent (KEEP policy) — safe to call on every launch.
         Scheduler.schedulePeriodic(this)
+        Scheduler.scheduleAlerts(this, Settings(this).scheduleAlerts)
     }
 }

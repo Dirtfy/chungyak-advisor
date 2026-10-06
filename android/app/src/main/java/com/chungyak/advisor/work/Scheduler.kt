@@ -16,6 +16,7 @@ object Scheduler {
 
     private const val PERIODIC = "chungyak_periodic_check"
     private const val ONESHOT = "chungyak_manual_check"
+    private const val ALERTS = "chungyak_schedule_alerts"
 
     /**
      * Register the repeating check. Interval is 6h by default — well above the
@@ -36,6 +37,20 @@ object Scheduler {
             ExistingPeriodicWorkPolicy.KEEP,
             request,
         )
+    }
+
+    /**
+     * 청약 일정 알림 확인(1시간 주기, 네트워크 불필요). 끄면 예약을 지운다.
+     * 켜져 있으면 KEEP — 앱 시작·재부팅마다 불러도 된다.
+     */
+    fun scheduleAlerts(context: Context, enabled: Boolean) {
+        val wm = WorkManager.getInstance(context)
+        if (!enabled) {
+            wm.cancelUniqueWork(ALERTS)
+            return
+        }
+        val request = PeriodicWorkRequestBuilder<ScheduleAlertWorker>(1, TimeUnit.HOURS).build()
+        wm.enqueueUniquePeriodicWork(ALERTS, ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
     /** Force an immediate check (the "지금 확인" button). */
