@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material3.Button
@@ -49,10 +50,10 @@ import com.chungyak.advisor.BuildConfig
 import com.chungyak.advisor.data.Settings
 import com.chungyak.advisor.update.UpdateViewModel
 
-/** 설정 탭(리디자인 3단계, docs/11): 서비스키 → 수집 범위 → 알림 → 백업 → 앱 정보, 섹션마다 흰 카드. */
+/** 설정 탭(리디자인 3단계, docs/11): 서비스키 → 수집 범위 → 알림 → 내 조건 → 백업 → 앱 정보, 섹션마다 흰 카드. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: NoticeViewModel) {
+fun SettingsScreen(vm: NoticeViewModel, onEditProfile: () -> Unit = {}) {
     Scaffold(topBar = { TopAppBar(title = { Text("설정") }) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
@@ -105,6 +106,17 @@ fun SettingsScreen(vm: NoticeViewModel) {
                     vm.scheduleAlerts,
                     vm::updateScheduleAlerts,
                 )
+            }
+            SettingsSection(Icons.Outlined.Person, "내 조건") {
+                Text(
+                    "처음 실행할 때 나온 단계별 안내로 내 조건을 다시 입력합니다. 지금 저장된 값이 채워진 채로 시작해요.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = vm::openOnboarding) { Text("온보딩 다시 하기") }
+                    TextButton(onClick = onEditProfile) { Text("내 조건 탭에서 고치기") }
+                }
             }
             SettingsSection(Icons.Outlined.Info, "데이터·앱 정보") {
                 Text("백업 (재설치·기기 변경 시 데이터 옮기기)", style = MaterialTheme.typography.bodyMedium)

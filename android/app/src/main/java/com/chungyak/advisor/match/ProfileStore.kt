@@ -20,12 +20,22 @@ class ProfileStore(context: Context) {
         get() = NotifyMode.of(prefs.getString(KEY_MODE, null))
         set(v) = prefs.edit().putString(KEY_MODE, v.name).apply()
 
-    fun clear() = prefs.edit().clear().apply()
+    /**
+     * 첫 실행 온보딩을 마쳤거나 '나중에 하기'로 넘겼는지(v0.9.0~). 프로필과 같은 파일이라 백업·기기 이전에서
+     * 함께 빠진다 → 프로필 없이 옮겨진 새 기기에서는 온보딩이 다시 뜬다.
+     */
+    var onboardingDone: Boolean
+        get() = prefs.getBoolean(KEY_ONBOARDING_DONE, false)
+        set(v) = prefs.edit().putBoolean(KEY_ONBOARDING_DONE, v).apply()
+
+    /** 프로필·알림 범위만 지운다. 온보딩 완료 여부는 남긴다('조건 지우기' 뒤에 온보딩이 다시 뜨지 않게). */
+    fun clear() = prefs.edit().remove(KEY_PROFILE).remove(KEY_MODE).apply()
 
     companion object {
         const val FILE = "chungyak_profile"
         private const val KEY_PROFILE = "profile_v1"
         private const val KEY_MODE = "notify_mode"
+        private const val KEY_ONBOARDING_DONE = "onboarding_done"
 
         fun encode(p: Profile) = JSONObject()
             .put("sido", p.sido).put("sigungu", p.sigungu).put("residenceMonths", p.residenceMonths)

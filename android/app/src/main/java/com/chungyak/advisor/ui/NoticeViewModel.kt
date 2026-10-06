@@ -76,6 +76,20 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
         notifyMode = mode
     }
 
+    /** 첫 실행 온보딩을 보여 줄지(v0.9.0~). 설정의 '온보딩 다시 하기'로도 켠다. */
+    var showOnboarding by mutableStateOf(Onboarding.shouldShow(profileStore.profile, profileStore.onboardingDone))
+        private set
+
+    fun openOnboarding() {
+        showOnboarding = true
+    }
+
+    /** 끝냈거나 '나중에 하기' — 둘 다 다시 자동으로 띄우지 않는다. */
+    fun closeOnboarding() {
+        profileStore.onboardingDone = true
+        showOnboarding = false
+    }
+
     fun clearProfile() {
         profileStore.clear()
         _profile.value = Profile()

@@ -49,6 +49,29 @@ class ProfileStoreTest {
         assertEquals(p, ProfileStore(ctx).profile)
     }
 
+    /** 온보딩 완료 여부(v0.9.0~): 저장·복원되고, '조건 지우기'로는 지워지지 않는다. */
+    @Test fun onboardingDone_survivesClear() {
+        val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val store = ProfileStore(ctx)
+        assertFalse(store.onboardingDone)
+        store.profile = Profile(sido = "서울")
+        store.onboardingDone = true
+        assertTrue(ProfileStore(ctx).onboardingDone)
+        store.clear()
+        assertFalse(ProfileStore(ctx).profile.isSet)
+        assertTrue(ProfileStore(ctx).onboardingDone)
+    }
+
+    /** 업데이트: v0.8.0까지 조건을 넣어 둔 사용자는 플래그가 없어도 온보딩이 뜨지 않는다. */
+    @Test fun existingUser_afterUpdate_noOnboarding() {
+        val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        ctx.getSharedPreferences(ProfileStore.FILE, android.content.Context.MODE_PRIVATE).edit()
+            .putString("profile_v1", """{"sido":"경기","account":"COMPREHENSIVE","accountOpened":"2019-03-15"}""").commit()
+        val store = ProfileStore(ctx)
+        assertFalse(com.chungyak.advisor.ui.Onboarding.shouldShow(store.profile, store.onboardingDone))
+        assertEquals("2019-03-15", store.profile.accountOpened)
+    }
+
     /** MDAT_TRGET_AREA_SECD: "N"은 비조정 — 예전엔 비어 있지 않으면 조정으로 봤다. */
     @Test fun adjustmentFlag() {
         assertTrue(ApplyHomeClient.adjustment("Y"))

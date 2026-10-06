@@ -1,0 +1,59 @@
+package com.chungyak.advisor.ui
+
+import com.chungyak.advisor.match.AccountType
+import com.chungyak.advisor.match.NotifyMode
+import com.chungyak.advisor.match.Profile
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.LocalDate
+
+/** '내 조건' 탭과 온보딩이 함께 쓰는 입력 모델(v0.9.0~). */
+class ProfileDraftTest {
+
+    private val today = LocalDate.parse("2026-10-06")
+
+    @Test fun ofThenBuild_keepsProfile() {
+        val p = Profile(
+            sido = "서울", residenceMonths = 24, homesOwned = 0, children = 2, account = AccountType.COMPREHENSIVE,
+            accountOpened = "2019-03-15", payments = 80, depositManwon = 900, householdSize = 4, incomePct = 110,
+            maxPriceManwon = 90_000, minAreaM2 = 59, maxAreaM2 = 85, dependents = 3,
+        )
+        assertEquals(p, ProfileDraft.of(p, NotifyMode.ELIGIBLE).build())
+    }
+
+    @Test fun emptyNumbers_meanUnset() {
+        val d = ProfileDraft.of(Profile(sido = "경기"), NotifyMode.ALL)
+        assertEquals("", d.num("payments")) // -1 → 빈칸
+        val b = d.withNum("payments", "").withNum("homesOwned", "").build()
+        assertEquals(-1, b.payments)
+        assertEquals(0, b.homesOwned) // 주택 수·자녀 수는 빈칸이면 0
+    }
+
+    @Test fun withNum_keepsDigitsOnly() {
+        val d = ProfileDraft.of(Profile(), NotifyMode.ALL).withNum("depositManwon", "1,500만원")
+        assertEquals("1500", d.num("depositManwon"))
+        assertEquals(1500, d.build().depositManwon)
+    }
+
+    @Test fun problems_taggedBySection() {
+        val d = ProfileDraft.of(
+            Profile(sido = "", married = true, marriageYm = "2022/05", accountOpened = "2027-01-01"),
+            NotifyMode.ALL,
+        ).withNum("dependents", "25")
+        assertEquals(
+            listOf(FormSection.RESIDENCE, FormSection.FAMILY, FormSection.ACCOUNT, FormSection.GAJEOM),
+            d.problems(today).map { it.section },
+        )
+    }
+
+    @Test fun validProfile_hasNoProblems() {
+        val d = ProfileDraft.of(Profile(sido = "인천", married = true, marriageYm = "2022-5", accountOpened = "2026-10-06"), NotifyMode.ALL)
+        assertTrue(d.problems(today).isEmpty())
+    }
+
+    @Test fun numKeysOfSteps_coverAllNumberFields() {
+        assertEquals(ProfileDraft.NUM_KEYS.toSet(), Onboarding.steps.flatMap(Onboarding::numKeys).toSet())
+        assertEquals(ProfileDraft.NUM_KEYS.toSet(), ProfileDraft.of(Profile(), NotifyMode.ALL).nums.keys)
+    }
+}

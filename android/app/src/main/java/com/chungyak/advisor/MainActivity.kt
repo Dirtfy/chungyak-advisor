@@ -90,6 +90,7 @@ import com.chungyak.advisor.match.Gajeom
 import com.chungyak.advisor.ui.GajeomCard
 import java.time.LocalDate
 import com.chungyak.advisor.ui.CompetitionFormat
+import com.chungyak.advisor.ui.OnboardingScreen
 import com.chungyak.advisor.ui.ProfileScreen
 import com.chungyak.advisor.ui.ScheduleBadge
 import com.chungyak.advisor.ui.NoticeViewModel
@@ -138,6 +139,20 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     val profile by vm.profile.collectAsState()
     val matches by vm.matches.collectAsState()
 
+    // 첫 실행(내 조건 없음) 온보딩 — 탭 바 없이 전체 화면. 끝나면 서비스키가 없을 때 설정 탭으로.
+    if (vm.showOnboarding) {
+        OnboardingScreen(
+            initial = profile, initialMode = vm.notifyMode,
+            scheduleAlerts = vm.scheduleAlerts, hasKey = vm.hasKey,
+            onScheduleAlerts = vm::updateScheduleAlerts,
+            onSaveStep = vm::saveProfile,
+            onClose = { completed ->
+                vm.closeOnboarding()
+                tab = if (!vm.hasKey) Tab.SETTINGS else if (completed) Tab.NOTICES else tab
+            },
+        )
+        return
+    }
     // 상세는 탭 바 없이 전체 화면(지도·본문 영역을 넓게).
     if (selected != null) {
         BackHandler { selectedId = null }
@@ -169,7 +184,7 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
                     onSave = { p, m -> vm.saveProfile(p, m); tab = Tab.NOTICES },
                     onClear = { vm.clearProfile() },
                 )
-                Tab.SETTINGS -> SettingsScreen(vm)
+                Tab.SETTINGS -> SettingsScreen(vm, onEditProfile = { tab = Tab.PROFILE })
             }
         }
     }
