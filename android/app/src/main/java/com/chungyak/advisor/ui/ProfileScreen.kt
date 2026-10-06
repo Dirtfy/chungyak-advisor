@@ -41,6 +41,7 @@ import androidx.compose.material3.rememberDatePickerState
 import com.chungyak.advisor.match.AccountPeriod
 import com.chungyak.advisor.match.AccountType
 import com.chungyak.advisor.match.Eligibility
+import com.chungyak.advisor.match.Gajeom
 import com.chungyak.advisor.match.NotifyMode
 import com.chungyak.advisor.match.Profile
 import java.time.Instant
@@ -74,6 +75,7 @@ fun ProfileScreen(
                 "householdSize" to initial.householdSize, "incomePct" to initial.incomePct,
                 "realEstateManwon" to initial.realEstateManwon, "maxPriceManwon" to initial.maxPriceManwon,
                 "minAreaM2" to initial.minAreaM2, "maxAreaM2" to initial.maxAreaM2,
+                "dependents" to initial.dependents,
             ).mapValues { (_, v) -> if (v >= 0) v.toString() else "" }
         )
     }
@@ -97,6 +99,7 @@ fun ProfileScreen(
             accountMonths = n("accountMonths"), payments = n("payments"), depositManwon = n("depositManwon"),
             householdSize = n("householdSize"), incomePct = n("incomePct"), realEstateManwon = n("realEstateManwon"),
             maxPriceManwon = n("maxPriceManwon"), minAreaM2 = n("minAreaM2"), maxAreaM2 = n("maxAreaM2"),
+            dependents = n("dependents"),
         )
     }
 
@@ -157,6 +160,17 @@ fun ProfileScreen(
             num("payments", "납입 인정 회차(국민주택용)")
             num("depositManwon", "예치금·납입 총액(만원)")
 
+            Section("청약 가점(민영주택 가점제)")
+            DateField("생년월일", p.birthDate, { p = p.copy(birthDate = it) })
+            if (p.everOwned) DateField("무주택이 된 날(집 처분일)", p.homelessSince, { p = p.copy(homelessSince = it) }, minYear = 1970)
+            num("dependents", "부양가족 수(본인 제외, 비우면 배우자+자녀로 추정)")
+            Text(
+                "부양가족: 배우자, 같은 등본의 미혼 자녀, 3년 이상 같은 등본으로 부양한 부모님(배우자 부모 포함).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            GajeomCard(Gajeom.calc(build(), LocalDate.now()), title = "오늘 기준 내 가점")
+
             Section("소득·자산")
             num("householdSize", "가구원 수")
             num("incomePct", "세대 월평균소득 (전년도 도시근로자 대비 %)")
@@ -191,6 +205,7 @@ fun ProfileScreen(
                         built.sido.isBlank() -> "거주 시·도를 골라 주세요."
                         built.accountOpened.isNotBlank() && AccountPeriod.parse(built.accountOpened).let { it == null || it.isAfter(LocalDate.now()) } ->
                             "청약통장 가입 일자가 올바르지 않습니다(미래 날짜 불가)."
+                        built.dependents > 20 -> "부양가족 수가 너무 큽니다."
                         built.married && built.marriageYm.isNotBlank() &&
                             !Regex("^\\d{4}-\\d{1,2}$").matches(built.marriageYm) -> "혼인신고 연월은 2022-05 형식으로 입력하세요."
                         else -> ""
@@ -231,34 +246,55 @@ private fun AccountOpenedField(opened: String, onChange: (String) -> Unit, manua
     }
     Text(info, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
 
-    if (picking) {
-        val zone = ZoneOffset.UTC // DatePicker는 UTC 자정 millis를 쓴다.
-        val todayMillis = LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()
-        val state = rememberDatePickerState(
-            initialSelectedDateMillis = date?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
-            yearRange = 1977..LocalDate.now().year,
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
-                override fun isSelectableYear(year: Int) = year <= LocalDate.now().year
-            },
+    if (picking) PastDatePicker("청약통장 가입 일자", date, 1977, onPick = onChange, onDismiss = { picking = false })
+}
+
+/** 날짜 하나 고르는 줄: "제목 yyyy-MM-dd [변경] [지우기]". 미래 날짜는 고를 수 없다. */
+@Composable
+private fun DateField(title: String, value: String, onChange: (String) -> Unit, minYear: Int = 1930) {
+    var picking by remember { mutableStateOf(false) }
+    val date = AccountPeriod.parse(value)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            if (date != null) "$title $date" else "$title 미입력",
+            Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
         )
-        DatePickerDialog(
-            onDismissRequest = { picking = false },
-            confirmButton = {
-                TextButton(
-                    enabled = state.selectedDateMillis != null,
-                    onClick = {
-                        state.selectedDateMillis?.let { ms ->
-                            val d = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
-                            if (!d.isAfter(LocalDate.now())) onChange(d.toString())
-                        }
-                        picking = false
-                    },
-                ) { Text("확인") }
-            },
-            dismissButton = { TextButton(onClick = { picking = false }) { Text("취소") } },
-        ) { DatePicker(state = state, title = { Text("청약통장 가입 일자", Modifier.padding(start = 24.dp, top = 16.dp)) }) }
+        OutlinedButton(onClick = { picking = true }) { Text(if (date != null) "변경" else "날짜 선택") }
+        if (date != null) TextButton(onClick = { onChange("") }) { Text("지우기") }
     }
+    if (picking) PastDatePicker(title, date, minYear, onPick = onChange, onDismiss = { picking = false })
+}
+
+/** 오늘까지의 날짜만 고를 수 있는 날짜 선택 대화상자. 고르면 "yyyy-MM-dd"로 [onPick]. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PastDatePicker(title: String, initial: LocalDate?, minYear: Int, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    val zone = ZoneOffset.UTC // DatePicker는 UTC 자정 millis를 쓴다.
+    val todayMillis = LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = initial?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
+        yearRange = minYear..LocalDate.now().year,
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
+            override fun isSelectableYear(year: Int) = year <= LocalDate.now().year
+        },
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = state.selectedDateMillis != null,
+                onClick = {
+                    state.selectedDateMillis?.let { ms ->
+                        val d = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+                        if (!d.isAfter(LocalDate.now())) onPick(d.toString())
+                    }
+                    onDismiss()
+                },
+            ) { Text("확인") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("취소") } },
+    ) { DatePicker(state = state, title = { Text(title, Modifier.padding(start = 24.dp, top = 16.dp)) }) }
 }
 
 @Composable

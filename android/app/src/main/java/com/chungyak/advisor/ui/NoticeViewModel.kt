@@ -15,6 +15,7 @@ import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.match.NotifyMode
 import com.chungyak.advisor.match.Profile
 import com.chungyak.advisor.match.ProfileStore
+import com.chungyak.advisor.match.Recommend
 import com.chungyak.advisor.work.Scheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -38,11 +39,6 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
     private val _sort = MutableStateFlow(SortOrder.of(settings.sortOrder))
     val sort: StateFlow<SortOrder> = _sort
 
-    /** 선택한 정렬을 적용한 목록. */
-    val notices: StateFlow<List<Notice>> =
-        combine(dao.observeAll(), _sort) { list, order -> NoticeSort.sort(list, order, today()) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     // ---- 개인화(내 조건) — 프로필은 기기 안에만 저장 ----
     private val profileStore = ProfileStore(app)
     private val _profile = MutableStateFlow(profileStore.profile)
@@ -59,6 +55,19 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
             }
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /** 공고별 추천 점수(추천순 정렬·카드 표시용). */
+    val scores: StateFlow<Map<String, Recommend.Score>> =
+        combine(dao.observeAll(), matches, _profile) { list, m, p ->
+            list.associate { it.id to Recommend.score(it, m[it.id], p) }
+        }.flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /** 선택한 정렬을 적용한 목록. */
+    val notices: StateFlow<List<Notice>> =
+        combine(dao.observeAll(), _sort, scores) { list, order, sc ->
+            if (order == SortOrder.RECOMMEND) Recommend.sort(list, sc, today()) else NoticeSort.sort(list, order, today())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun saveProfile(p: Profile, mode: NotifyMode) {
         profileStore.profile = p

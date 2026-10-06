@@ -84,7 +84,11 @@ import com.chungyak.advisor.data.Competition
 import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.map.LocationCard
+import com.chungyak.advisor.match.AccountPeriod
 import com.chungyak.advisor.match.Eligibility
+import com.chungyak.advisor.match.Gajeom
+import com.chungyak.advisor.ui.GajeomCard
+import java.time.LocalDate
 import com.chungyak.advisor.ui.CompetitionFormat
 import com.chungyak.advisor.ui.ProfileScreen
 import com.chungyak.advisor.ui.ScheduleBadge
@@ -179,6 +183,7 @@ private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (Stri
     val sort by vm.sort.collectAsState()
     val profile by vm.profile.collectAsState()
     val matches by vm.matches.collectAsState()
+    val scores by vm.scores.collectAsState()
     val today = vm.today()
     var onlyMatched by rememberSaveable { mutableStateOf(false) }
     val shown = if (onlyMatched && profile.isSet)
@@ -220,6 +225,13 @@ private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (Stri
                         TextButton(onClick = { onGoTab(Tab.PROFILE) }) { Text("내 조건을 입력하면 맞는 공고만 알려 드려요 〉") }
                     }
                     SortBar(sort, vm::setSort)
+                    if (sort == SortOrder.RECOMMEND) Text(
+                        "추천 점수(100) = 내 조건 판정 40 + 가점 20 + 경쟁률(낮을수록) 25 + 분양가 상한 적합 15. " +
+                            "접수 예정·진행 중인 공고가 먼저, 마감된 공고는 뒤에." +
+                            if (!profile.isSet) " 내 조건을 입력하면 더 정확해져요." else "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             when {
@@ -242,7 +254,10 @@ private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (Stri
                     )
                 }
                 else -> items(shown, key = { it.id }) {
-                    NoticeRow(it, today, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized), matches[it.id]) { onOpen(it.id) }
+                    NoticeRow(
+                        it, today, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized), matches[it.id],
+                        recommend = if (sort == SortOrder.RECOMMEND) scores[it.id]?.total else null,
+                    ) { onOpen(it.id) }
                 }
             }
         }
@@ -316,7 +331,15 @@ private fun StatusCard(status: String, onCheck: () -> Unit) {
 /** 목록 카드(리디자인, docs/11): 지역·규제·일정 배지 → 단지명 → 주소 → 핵심 숫자 3칸 → 내 조건 판정. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun NoticeRow(n: Notice, today: String, cmpet: String, match: Eligibility.Result?, onClick: () -> Unit) {
+internal fun NoticeRow(
+    n: Notice,
+    today: String,
+    cmpet: String,
+    match: Eligibility.Result?,
+    /** 추천순일 때만: 추천 점수(0~100). */
+    recommend: Int? = null,
+    onClick: () -> Unit,
+) {
     Card(
         Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
@@ -327,6 +350,7 @@ internal fun NoticeRow(n: Notice, today: String, cmpet: String, match: Eligibili
                     Pill(n.areaName, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
                     if (n.speculationArea) Pill("투기과열", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
                     if (n.adjustmentArea) Pill("조정대상", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
+                    if (recommend != null) Pill("추천 $recommend", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
                 }
                 ScheduleBadge.of(n, today)?.let { b ->
                     val (bg, fg) = when (b.tone) {
@@ -393,6 +417,9 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibilit
     val models by remember(n.id) { vm.models(n.id) }.collectAsState(initial = emptyList())
     val cmpets by remember(n.id) { vm.competitions(n.id) }.collectAsState(initial = emptyList())
     val cmpetSummary = CompetitionFormat.summary(n, vm.today(), vm.cmpetUnauthorized)
+    val profile by vm.profile.collectAsState()
+    // 가점은 입주자모집공고일 기준(공고일을 못 읽으면 오늘).
+    val gajeom = if (profile.isSet) Gajeom.calc(profile, AccountPeriod.parse(n.noticeDate) ?: LocalDate.now()) else null
     val uri = LocalUriHandler.current
 
     Scaffold(
@@ -406,7 +433,7 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibilit
         },
     ) { padding ->
         NoticeDetailBody(
-            n, vm.today(), cmpetSummary, models, cmpets, match,
+            n, vm.today(), cmpetSummary, models, cmpets, match, gajeom,
             modifier = Modifier.fillMaxSize().padding(padding),
             onOpenNotice = { runCatching { uri.openUri(n.url) } },
             location = { LocationCard(n.name, n.address) },
@@ -426,6 +453,7 @@ internal fun NoticeDetailBody(
     models: List<HouseModel>,
     cmpets: List<Competition>,
     match: Eligibility.Result?,
+    gajeom: Gajeom.Result? = null,
     modifier: Modifier = Modifier,
     scroll: ScrollState = rememberScrollState(),
     onOpenNotice: () -> Unit = {},
@@ -439,6 +467,7 @@ internal fun NoticeDetailBody(
         DetailSummaryCard(n, today, cmpetSummary)
         location()
         if (match != null) MatchCard(match)
+        if (gajeom != null) GajeomCard(gajeom, title = "이 공고 기준 내 가점")
         PriceCard(n, models)
         CompetitionCard(cmpetSummary, cmpets)
         Text(

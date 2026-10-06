@@ -40,6 +40,7 @@ class ProfileStore(context: Context) {
             .put("dualIncome", p.dualIncome).put("realEstateManwon", p.realEstateManwon)
             .put("taxYears5", p.taxYears5).put("interestSido", JSONArray(p.interestSido.toList()))
             .put("maxPriceManwon", p.maxPriceManwon).put("minAreaM2", p.minAreaM2).put("maxAreaM2", p.maxAreaM2)
+            .put("birthDate", p.birthDate).put("homelessSince", p.homelessSince).put("dependents", p.dependents)
 
         fun decode(o: JSONObject) = Profile(
             sido = o.optString("sido"), sigungu = o.optString("sigungu"),
@@ -56,6 +57,8 @@ class ProfileStore(context: Context) {
             interestSido = o.optJSONArray("interestSido")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet(),
             maxPriceManwon = o.optInt("maxPriceManwon", -1), minAreaM2 = o.optInt("minAreaM2", -1),
             maxAreaM2 = o.optInt("maxAreaM2", -1),
+            birthDate = o.optString("birthDate"), homelessSince = o.optString("homelessSince"),
+            dependents = o.optInt("dependents", -1),
         )
     }
 }

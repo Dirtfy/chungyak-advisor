@@ -59,6 +59,10 @@ data class Profile(
     val dualIncome: Boolean = false,
     val realEstateManwon: Int = -1,     // 세대 부동산 자산(만원, 선택)
     val taxYears5: Boolean = false,     // 소득세 5년 이상 납부(생애최초)
+    // 가점(v0.8.0~, 선택)
+    val birthDate: String = "",         // 생년월일 "yyyy-MM-dd" — 무주택기간 기산(만 30세)
+    val homelessSince: String = "",     // 과거에 집이 있었다면 처분해 무주택이 된 날 "yyyy-MM-dd"
+    val dependents: Int = -1,           // 부양가족 수(본인 제외). -1 = 미입력 → 배우자+자녀로 추정
     // 관심 필터(선택)
     val interestSido: Set<String> = emptySet(), // 비어 있으면 전체
     val maxPriceManwon: Int = -1,

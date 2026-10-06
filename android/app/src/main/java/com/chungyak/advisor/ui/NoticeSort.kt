@@ -8,7 +8,9 @@ enum class SortOrder(val label: String) {
     RECEIPT_NEAR("접수일 가까운 순"),
     PRICE_ASC("분양가 낮은 순"),
     PRICE_DESC("분양가 높은 순"),
-    CMPET_DESC("경쟁률 높은 순");
+    CMPET_DESC("경쟁률 높은 순"),
+    /** 내 조건 판정·가점·경쟁률·분양가로 매긴 추천 점수 순(match/Recommend.kt). */
+    RECOMMEND("추천순");
 
     companion object {
         val DEFAULT = NOTICE_DESC
@@ -40,13 +42,15 @@ object NoticeSort {
             .thenByDescending { lowPrice(it) }.then(byNoticeDesc)
         SortOrder.CMPET_DESC -> compareBy<Notice> { it.cmpetMaxRate <= 0.0 }
             .thenByDescending { it.cmpetMaxRate }.then(byNoticeDesc)
+        // 점수가 필요해 실제 정렬은 Recommend.sort(뷰모델). 점수 없이 부르면 접수일 순으로 대신한다.
+        SortOrder.RECOMMEND -> comparator(SortOrder.RECEIPT_NEAR, today)
     }
 
     fun sort(list: List<Notice>, order: SortOrder, today: String): List<Notice> =
         list.sortedWith(comparator(order, today))
 
     /** 0 = 접수 예정/진행 중, 1 = 마감, 2 = 접수일 정보 없음. */
-    private fun receiptGroup(n: Notice, today: String): Int = when {
+    internal fun receiptGroup(n: Notice, today: String): Int = when {
         n.rank1Start.isBlank() -> 2
         n.rank1End.ifBlank { n.rank1Start } >= today -> 0
         else -> 1

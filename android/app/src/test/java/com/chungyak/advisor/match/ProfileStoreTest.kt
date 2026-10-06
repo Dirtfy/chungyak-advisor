@@ -22,6 +22,7 @@ class ProfileStoreTest {
             accountMonths = 30, payments = 30, depositManwon = 600, householdSize = 4, incomePct = 120,
             dualIncome = true, realEstateManwon = 20_000, taxYears5 = true, interestSido = setOf("서울", "경기"),
             maxPriceManwon = 120_000, minAreaM2 = 59, maxAreaM2 = 85,
+            birthDate = "1990-02-03", homelessSince = "2020-05-06", dependents = 3,
         )
         assertEquals(p, ProfileStore.decode(JSONObject(ProfileStore.encode(p).toString())))
         assertFalse(ProfileStore.decode(JSONObject()).isSet)

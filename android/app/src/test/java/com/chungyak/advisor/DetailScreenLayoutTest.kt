@@ -107,6 +107,10 @@ class DetailScreenLayoutTest {
                     Box(Modifier.width(widthDp.dp).height(heightDp.dp).background(MaterialTheme.colorScheme.background)) {
                         NoticeDetailBody(
                             n, "2026-10-04", "집계 중", models(n.id), cmpets(n.id), match(n.noticeDate),
+                            gajeom = com.chungyak.advisor.match.Gajeom.calc(
+                                com.chungyak.advisor.match.Profile(sido = "서울", birthDate = "1988-03-02", married = true, children = 1),
+                                java.time.LocalDate.parse("2026-10-04"),
+                            ),
                             scroll = scroll,
                             location = { LocationCardContent(n.address, geo, online = true, onOpen = {}, onRetry = {}, map = map) },
                         )
