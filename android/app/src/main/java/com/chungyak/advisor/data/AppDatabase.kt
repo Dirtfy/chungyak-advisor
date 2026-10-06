@@ -12,11 +12,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 // v3 (앱 v0.2.0): 주택형별 캐시 table (HouseModel) + Notice.modelsFetchedAt.
 // v4 (앱 v0.3.0~): 경쟁률 table (Competition) + Notice.cmpet*.
 // v5 (앱 v0.5.0~): 개인화 매칭 — Notice.houseDtl(민영/국민) + HouseModel 특별공급 유형별 세대수.
+// v6 (앱 v0.10.0~): 공고 검색 — Notice.builder(사업주체) + Notice.contractor(시공사).
 //
 // 규칙: 업데이트 시 사용자 데이터 보존 — 파괴적 마이그레이션 금지. 스키마를 바꾸면 version을 올리고
 // MIGRATION_n_n+1을 추가해 [MIGRATIONS]에 넣는다(기존 것은 지우지 않는다). 스키마 JSON은
 // app/schemas/에 export되어 커밋되며 MigrationTest가 모든 이전 버전 → 최신 경로를 검증한다.
-@Database(entities = [Notice::class, HouseModel::class, Competition::class], version = 5, exportSchema = true)
+@Database(entities = [Notice::class, HouseModel::class, Competition::class], version = 6, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun noticeDao(): NoticeDao
     abstract fun houseModelDao(): HouseModelDao
@@ -72,6 +73,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v5 → v6: 컬럼 추가만. 기존 공고는 빈 값으로 두고 다음 폴링(CheckWorker → updateMeta)에서 채운다. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `notices` ADD COLUMN `builder` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `notices` ADD COLUMN `contractor` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         const val COMPETITIONS_DDL = "CREATE TABLE IF NOT EXISTS `competitions` (" +
             "`noticeId` TEXT NOT NULL, `modelNo` TEXT NOT NULL, `houseType` TEXT NOT NULL, " +
             "`rank` INTEGER NOT NULL, `resideCode` TEXT NOT NULL, `resideName` TEXT NOT NULL, " +
@@ -80,7 +89,7 @@ abstract class AppDatabase : RoomDatabase() {
             "PRIMARY KEY(`noticeId`, `modelNo`, `rank`, `resideCode`))"
 
         /** 모든 버전 경로. 새 마이그레이션은 여기에 추가만 한다. */
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 
         fun build(context: Context, name: String = NAME): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, name)

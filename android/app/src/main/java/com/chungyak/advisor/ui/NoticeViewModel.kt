@@ -96,6 +96,9 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
         notifyMode = profileStore.notifyMode
     }
 
+    /** 공고 검색어(v0.10.0~, [NoticeSearch]). 저장하지 않는 화면 상태 — 상세를 열었다 돌아와도 남는다. */
+    var query by mutableStateOf("")
+
     fun setSort(order: SortOrder) {
         settings.sortOrder = order.name
         _sort.value = order

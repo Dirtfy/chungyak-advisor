@@ -44,9 +44,12 @@ interface NoticeDao {
     @Query("SELECT * FROM notices")
     suspend fun all(): List<Notice>
 
-    /** 재폴링 때 바뀔 수 있는 공고 속성(주택 구분·규제지역) 갱신. 알림 여부 등은 건드리지 않는다. */
-    @Query("UPDATE notices SET houseDtl = :houseDtl, speculationArea = :spec, adjustmentArea = :adj WHERE id = :id")
-    suspend fun updateMeta(id: String, houseDtl: String, spec: Boolean, adj: Boolean)
+    /** 재폴링 때 바뀔 수 있는 공고 속성(주택 구분·규제지역·사업주체·시공사) 갱신. 알림 여부 등은 건드리지 않는다. */
+    @Query(
+        "UPDATE notices SET houseDtl = :houseDtl, speculationArea = :spec, adjustmentArea = :adj, " +
+            "builder = :builder, contractor = :contractor WHERE id = :id"
+    )
+    suspend fun updateMeta(id: String, houseDtl: String, spec: Boolean, adj: Boolean, builder: String, contractor: String)
 
     @Query("SELECT * FROM notices WHERE id IN (:ids)")
     suspend fun byIds(ids: List<String>): List<Notice>

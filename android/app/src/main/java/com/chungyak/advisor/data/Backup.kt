@@ -85,7 +85,7 @@ object Backup {
         .put("modelsFetchedAt", n.modelsFetchedAt).put("cmpetMaxRate", n.cmpetMaxRate)
         .put("cmpetAvgRate", n.cmpetAvgRate).put("cmpetFetchedAt", n.cmpetFetchedAt)
         .put("cmpetFinal", n.cmpetFinal).put("firstSeen", n.firstSeen).put("notified", n.notified)
-        .put("houseDtl", n.houseDtl)
+        .put("houseDtl", n.houseDtl).put("builder", n.builder).put("contractor", n.contractor)
 
     private fun notice(o: JSONObject) = Notice(
         id = o.getString("id"), houseManageNo = o.optString("houseManageNo"),
@@ -101,6 +101,7 @@ object Backup {
         cmpetAvgRate = o.optDouble("cmpetAvgRate", 0.0), cmpetFetchedAt = o.optLong("cmpetFetchedAt"),
         cmpetFinal = o.optBoolean("cmpetFinal"), firstSeen = o.optLong("firstSeen"),
         notified = o.optBoolean("notified", true), houseDtl = o.optString("houseDtl"),
+        builder = o.optString("builder"), contractor = o.optString("contractor"),
     )
 
     private fun modelJson(m: HouseModel) = JSONObject()

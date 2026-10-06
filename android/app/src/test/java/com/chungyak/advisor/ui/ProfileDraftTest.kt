@@ -47,6 +47,14 @@ class ProfileDraftTest {
         )
     }
 
+    @Test fun residenceSince_futureOrBad_isProblem() {
+        fun probs(since: String) = ProfileDraft.of(Profile(sido = "서울", residenceSince = since), NotifyMode.ALL).problems(today)
+        assertEquals(listOf(FormSection.RESIDENCE), probs("2026-10-07").map { it.section })
+        assertEquals(listOf(FormSection.RESIDENCE), probs("2026-13-01").map { it.section })
+        assertTrue(probs("2026-10-06").isEmpty())
+        assertTrue(probs("").isEmpty())
+    }
+
     @Test fun validProfile_hasNoProblems() {
         val d = ProfileDraft.of(Profile(sido = "인천", married = true, marriageYm = "2022-5", accountOpened = "2026-10-06"), NotifyMode.ALL)
         assertTrue(d.problems(today).isEmpty())

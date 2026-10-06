@@ -95,6 +95,7 @@ fun OnboardingScreen(
                 LinearProgressIndicator(
                     progress = { (index + 1f) / steps.size },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    drawStopIndicator = {}, // M3 1.3 트랙 끝 점(stop indicator) 끔 — 오너 피드백 v0.10.0
                 )
             }
         },

@@ -58,9 +58,12 @@ object Eligibility {
         val notes = ArrayList<String>()
         // 가입 일자가 있으면 판정할 때마다 공고일 기준으로 다시 계산 → 저장 시점 값으로 굳지 않는다.
         val asOf = AccountPeriod.parse(n.noticeDate) ?: today
-        val p = profile.copy(accountMonths = profile.accountMonthsAt(asOf))
+        val p = profile.copy(accountMonths = profile.accountMonthsAt(asOf), residenceMonths = profile.residenceMonthsAt(asOf))
         if (AccountPeriod.parse(profile.accountOpened) != null) {
             notes += "통장 가입 ${AccountPeriod.label(p.accountMonths)} — 가입일 ${profile.accountOpened}, 공고일 $asOf 기준"
+        }
+        if (AccountPeriod.parse(profile.residenceSince) != null) {
+            notes += "거주 ${AccountPeriod.label(p.residenceMonths)} — 전입일 ${profile.residenceSince}, 공고일 $asOf 기준"
         }
         val kind = kindOf(n.houseDtl)
         if (kind == Kind.UNKNOWN) notes += "주택 구분(민영/국민) 미확인 — 민영 기준으로 판정"

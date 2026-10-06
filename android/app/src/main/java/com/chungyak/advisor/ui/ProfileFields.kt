@@ -70,7 +70,11 @@ fun ProfileFields(section: FormSection, d: ProfileDraft, onChange: (ProfileDraft
                 value = p.sigungu, onValueChange = { v -> edit { it.copy(sigungu = v.take(20)) } },
                 label = { Text("시·군·구 (예: 성남시, 강남구)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
-            num("residenceMonths", "현 거주지 연속 거주 기간(개월)")
+            ResidenceSinceField(
+                since = p.residenceSince,
+                legacyMonths = p.residenceMonths,
+                onChange = { v -> edit { it.copy(residenceSince = v, residenceMonths = -1) } },
+            )
         }
 
         FormSection.HOUSEHOLD -> {
@@ -170,6 +174,20 @@ private fun AccountOpenedField(opened: String, onChange: (String) -> Unit, manua
     Text(info, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
 
     if (picking) PastDatePicker("청약통장 가입 일자", date, 1977, onPick = onChange, onDismiss = { picking = false })
+}
+
+/** 현 거주지 전입일: 날짜 선택기 + 오늘 기준 연속 거주 기간 표시. 날짜를 고르면 예전 개월 수 입력은 버린다. */
+@Composable
+private fun ResidenceSinceField(since: String, legacyMonths: Int, onChange: (String) -> Unit) {
+    DateField("현 거주지 전입일", since, onChange)
+    val date = AccountPeriod.parse(since)
+    val info = when {
+        date != null -> "약 ${AccountPeriod.label(AccountPeriod.months(date, LocalDate.now()).coerceAtLeast(0))} 거주 · 오늘 기준. " +
+            "판정은 공고일 기준으로 매번 다시 계산합니다."
+        legacyMonths >= 0 -> "예전 입력: 거주 ${AccountPeriod.label(legacyMonths)} — 전입일을 넣으면 기간이 자동으로 늘어납니다."
+        else -> "주민등록상 전입일을 넣으면 연속 거주 기간을 자동 계산합니다."
+    }
+    Text(info, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
 }
 
 /** 날짜 하나 고르는 줄: "제목 yyyy-MM-dd [변경] [지우기]". 미래 날짜는 고를 수 없다. */

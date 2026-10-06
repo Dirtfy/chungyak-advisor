@@ -57,7 +57,7 @@ fun UpdateDialog(vm: UpdateViewModel = viewModel()) {
                 when (s) {
                     is UpdateState.Downloading -> {
                         if (s.progress >= 0) {
-                            LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.fillMaxWidth())
+                            LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.fillMaxWidth(), drawStopIndicator = {})
                             Text("다운로드 ${(s.progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
                         } else {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())

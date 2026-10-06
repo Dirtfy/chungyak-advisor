@@ -30,6 +30,12 @@ jobs:
           cache: gradle
       - name: Unit tests + debug APK
         run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+      # Room이 KSP로 내보낸 스키마 JSON(app/schemas) — 서버에서 빌드하지 않으므로 여기서 받아 커밋한다.
+      - name: Room schema JSON
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: room-schemas
+          path: android/app/schemas
       - name: Test reports on failure
         if: failure()
         run: find app/build/test-results -name '*.xml' -exec grep -l '<failure' {} + | xargs -r -n1 sed -n '/<failure/,/<\/failure>/p' | head -200

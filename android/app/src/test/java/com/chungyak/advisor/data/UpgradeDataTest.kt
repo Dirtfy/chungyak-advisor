@@ -119,6 +119,30 @@ class UpgradeDataTest {
         db.close()
     }
 
+    @Test fun v5_app050to090_upgradesTo6_keepsDataAndFillsBuilderOnPoll() = runBlocking {
+        createOld(5, listOf(v1Notices)) { db ->
+            insertV1(db, "a", 1)
+            AppDatabase.MIGRATION_1_2.migrate(db); AppDatabase.MIGRATION_2_3.migrate(db)
+            AppDatabase.MIGRATION_3_4.migrate(db); AppDatabase.MIGRATION_4_5.migrate(db)
+            db.execSQL("UPDATE notices SET houseDtl='민영', priceMaxManwon=119800, modelsFetchedAt=5")
+        }
+        val db = openCurrent()
+        val n = db.noticeDao().all().single()
+        assertTrue(n.notified)
+        assertEquals("민영", n.houseDtl)
+        assertEquals(119800, n.priceMaxManwon)
+        assertEquals(5L, n.modelsFetchedAt) // v6는 주택형을 다시 받지 않는다
+        assertEquals("", n.builder)
+        assertEquals("", n.contractor)
+        // 다음 폴링: 이미 있는 공고에도 사업주체·시공사를 채운다(알림 여부는 그대로).
+        db.noticeDao().updateMeta("a", "민영", false, true, "OO도시개발", "XX건설")
+        val u = db.noticeDao().all().single()
+        assertEquals("OO도시개발", u.builder)
+        assertEquals("XX건설", u.contractor)
+        assertTrue(u.notified)
+        db.close()
+    }
+
     @Test fun v4_sameVersion_reopenKeepsEverything() = runBlocking {
         // 0.3.0/0.4.0 → 0.4.1: 스키마 동일. 현재 앱으로 만들고 닫았다 다시 열어도 그대로.
         var db = openCurrent()
@@ -175,6 +199,6 @@ class UpgradeDataTest {
         resultDate = "2026-10-20", houseKind = "APT", speculationArea = true, adjustmentArea = false,
         url = "u", homepage = "h", priceMinManwon = 50000, priceMaxManwon = 60000, modelsFetchedAt = 7,
         cmpetMaxRate = 3.5, cmpetAvgRate = 1.2, cmpetFetchedAt = 8, cmpetFinal = true,
-        firstSeen = 9, notified = true,
+        builder = "OO도시개발", contractor = "XX건설", firstSeen = 9, notified = true,
     )
 }

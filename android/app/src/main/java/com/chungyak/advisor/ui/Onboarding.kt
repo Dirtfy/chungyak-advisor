@@ -36,7 +36,7 @@ object Onboarding {
         val p = draft.profile
         val o = atStepStart.profile
         val profile = when (step) {
-            FormSection.RESIDENCE -> p.copy(sido = o.sido, sigungu = o.sigungu)
+            FormSection.RESIDENCE -> p.copy(sido = o.sido, sigungu = o.sigungu, residenceSince = o.residenceSince, residenceMonths = o.residenceMonths)
             FormSection.HOUSEHOLD -> p.copy(
                 householdHead = o.householdHead, everOwned = o.everOwned, wonWithin5y = o.wonWithin5y, usedSpecial = o.usedSpecial,
             )
@@ -57,7 +57,7 @@ object Onboarding {
 
     /** 단계별 숫자 칸(ProfileDraft.NUM_KEYS의 부분 집합). */
     fun numKeys(step: FormSection): List<String> = when (step) {
-        FormSection.RESIDENCE -> listOf("residenceMonths")
+        FormSection.RESIDENCE -> emptyList()
         FormSection.HOUSEHOLD -> listOf("homesOwned")
         FormSection.FAMILY -> listOf("children")
         FormSection.ACCOUNT -> listOf("accountMonths", "payments", "depositManwon")

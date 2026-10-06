@@ -39,6 +39,9 @@ data class Notice(
     val cmpetFinal: Boolean = false,
     // HOUSE_DTL_SECD_NM 주택상세구분: "민영" / "국민". "" = 미확인(v0.4.4 이하에서 수집) → 다음 폴링에서 채움.
     val houseDtl: String = "",
+    // BSNS_MBY_NM 사업주체(시행사) / CNSTRCT_ENTRPS_NM 시공사(v0.10.0~, 검색용). "" = 미확인 → 다음 폴링에서 채움.
+    val builder: String = "",
+    val contractor: String = "",
     val firstSeen: Long,         // epoch millis this row was first collected
     val notified: Boolean,       // whether a local notification was already posted
 )

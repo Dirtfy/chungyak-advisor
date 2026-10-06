@@ -12,7 +12,8 @@ import java.time.LocalDate
 enum class FormSection(val title: String, val help: String) {
     RESIDENCE(
         "거주",
-        "지금 주민등록상 사는 곳입니다. '해당지역'(공고 지역에 일정 기간 이상 산 사람) 우선 공급과 1순위 판정에 씁니다.",
+        "지금 주민등록상 사는 곳과 전입일입니다. '해당지역'(공고 지역에 일정 기간 이상 산 사람) 우선 공급과 1순위 판정에 씁니다. " +
+            "전입일은 주민등록등본(정부24)에서 볼 수 있어요.",
     ),
     HOUSEHOLD(
         "세대·주택",
@@ -66,7 +67,7 @@ data class ProfileDraft(
     fun build(): Profile {
         fun n(k: String, unset: Int = -1) = nums[k]?.toIntOrNull() ?: unset
         return profile.copy(
-            residenceMonths = n("residenceMonths"), homesOwned = n("homesOwned", 0), children = n("children", 0),
+            homesOwned = n("homesOwned", 0), children = n("children", 0),
             accountMonths = n("accountMonths"), payments = n("payments"), depositManwon = n("depositManwon"),
             householdSize = n("householdSize"), incomePct = n("incomePct"), realEstateManwon = n("realEstateManwon"),
             maxPriceManwon = n("maxPriceManwon"), minAreaM2 = n("minAreaM2"), maxAreaM2 = n("maxAreaM2"),
@@ -79,6 +80,8 @@ data class ProfileDraft(
         val b = build()
         return buildList {
             if (b.sido.isBlank()) add(FormProblem(FormSection.RESIDENCE, "거주 시·도를 골라 주세요."))
+            if (b.residenceSince.isNotBlank() && AccountPeriod.parse(b.residenceSince).let { it == null || it.isAfter(today) })
+                add(FormProblem(FormSection.RESIDENCE, "전입일이 올바르지 않습니다(미래 날짜 불가)."))
             if (b.married && b.marriageYm.isNotBlank() && !Regex("^\\d{4}-\\d{1,2}$").matches(b.marriageYm))
                 add(FormProblem(FormSection.FAMILY, "혼인신고 연월은 2022-05 형식으로 입력하세요."))
             if (b.accountOpened.isNotBlank() && AccountPeriod.parse(b.accountOpened).let { it == null || it.isAfter(today) })
@@ -89,13 +92,13 @@ data class ProfileDraft(
 
     companion object {
         val NUM_KEYS = listOf(
-            "residenceMonths", "homesOwned", "children", "accountMonths", "payments", "depositManwon",
+            "homesOwned", "children", "accountMonths", "payments", "depositManwon",
             "householdSize", "incomePct", "realEstateManwon", "maxPriceManwon", "minAreaM2", "maxAreaM2", "dependents",
         )
 
         fun of(p: Profile, mode: NotifyMode): ProfileDraft {
             val values = mapOf(
-                "residenceMonths" to p.residenceMonths, "homesOwned" to p.homesOwned,
+                "homesOwned" to p.homesOwned,
                 "children" to p.children, "accountMonths" to p.accountMonths,
                 "payments" to p.payments, "depositManwon" to p.depositManwon,
                 "householdSize" to p.householdSize, "incomePct" to p.incomePct,

@@ -27,6 +27,15 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import com.chungyak.advisor.ui.NoticeSearch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
@@ -190,7 +199,10 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     }
 }
 
-/** 공고 탭: 상태 → 개수·필터 → 정렬 → 카드 목록. 머리 부분도 목록과 함께 스크롤된다. */
+/**
+ * 공고 탭: 검색창(고정) → 상태 → 개수·필터 → 정렬 → 카드 목록. 머리 부분도 목록과 함께 스크롤된다.
+ * 목록 = 정렬된 공고 → '가능·확인 필요만' 필터 → 검색어([NoticeSearch]) 순으로 거른 것.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (String) -> Unit, onGoTab: (Tab) -> Unit) {
@@ -201,8 +213,11 @@ private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (Stri
     val scores by vm.scores.collectAsState()
     val today = vm.today()
     var onlyMatched by rememberSaveable { mutableStateOf(false) }
-    val shown = if (onlyMatched && profile.isSet)
+    val filtered = if (onlyMatched && profile.isSet)
         notices.filter { matches[it.id]?.verdict != Eligibility.Verdict.INELIGIBLE } else notices
+    // 검색은 필터 결과 안에서 하고, 정렬(vm.notices 순서)은 그대로 둔다.
+    val query = vm.query.trim()
+    val shown = NoticeSearch.filter(filtered, query)
 
     Scaffold(
         topBar = {
@@ -216,67 +231,105 @@ private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (Stri
             )
         },
     ) { padding ->
-        LazyColumn(
-            Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (!vm.hasKey) item(key = "nokey") { KeyMissingCard { onGoTab(Tab.SETTINGS) } }
-            item(key = "status") { StatusCard(status = status, onCheck = { vm.checkNow(); vm.refreshStatus() }) }
-            item(key = "head") {
-                Column {
-                    Text(
-                        if (profile.isSet) "수집된 공고 ${notices.size}건 · 내 조건에 맞음 " +
-                            "${notices.count { matches[it.id]?.verdict == Eligibility.Verdict.ELIGIBLE }}건"
-                        else "수집된 공고 ${notices.size}건",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    if (profile.isSet) {
-                        FilterChip(
-                            selected = onlyMatched, onClick = { onlyMatched = !onlyMatched },
-                            label = { Text("가능·확인 필요만 보기") },
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            // 검색창은 목록 위에 고정(스크롤해도 남는다). 공고가 하나도 없으면 숨긴다.
+            if (notices.isNotEmpty()) SearchField(vm.query, onChange = { vm.query = it })
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (!vm.hasKey) item(key = "nokey") { KeyMissingCard { onGoTab(Tab.SETTINGS) } }
+                item(key = "status") { StatusCard(status = status, onCheck = { vm.checkNow(); vm.refreshStatus() }) }
+                item(key = "head") {
+                    Column {
+                        Text(
+                            if (profile.isSet) "수집된 공고 ${notices.size}건 · 내 조건에 맞음 " +
+                                "${notices.count { matches[it.id]?.verdict == Eligibility.Verdict.ELIGIBLE }}건"
+                            else "수집된 공고 ${notices.size}건",
+                            style = MaterialTheme.typography.titleMedium,
                         )
-                    } else {
-                        TextButton(onClick = { onGoTab(Tab.PROFILE) }) { Text("내 조건을 입력하면 맞는 공고만 알려 드려요 〉") }
+                        if (query.isNotEmpty() && shown.isNotEmpty()) Text(
+                            "'$query' 검색 결과 ${shown.size}건",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        if (profile.isSet) {
+                            FilterChip(
+                                selected = onlyMatched, onClick = { onlyMatched = !onlyMatched },
+                                label = { Text("가능·확인 필요만 보기") },
+                            )
+                        } else {
+                            TextButton(onClick = { onGoTab(Tab.PROFILE) }) { Text("내 조건을 입력하면 맞는 공고만 알려 드려요 〉") }
+                        }
+                        SortBar(sort, vm::setSort)
+                        if (sort == SortOrder.RECOMMEND) Text(
+                            "추천 점수(100) = 내 조건 판정 40 + 가점 20 + 경쟁률(낮을수록) 25 + 분양가 상한 적합 15. " +
+                                "접수 예정·진행 중인 공고가 먼저, 마감된 공고는 뒤에." +
+                                if (!profile.isSet) " 내 조건을 입력하면 더 정확해져요." else "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    SortBar(sort, vm::setSort)
-                    if (sort == SortOrder.RECOMMEND) Text(
-                        "추천 점수(100) = 내 조건 판정 40 + 가점 20 + 경쟁률(낮을수록) 25 + 분양가 상한 적합 15. " +
-                            "접수 예정·진행 중인 공고가 먼저, 마감된 공고는 뒤에." +
-                            if (!profile.isSet) " 내 조건을 입력하면 더 정확해져요." else "",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
-            }
-            when {
-                notices.isEmpty() -> item(key = "empty") {
-                    if (vm.hasKey) EmptyState(
-                        Icons.Outlined.Inbox, "아직 수집된 공고가 없어요",
-                        "위의 새로고침(지금 확인)을 누르면 바로 조회합니다. 이후엔 6시간마다 자동으로 확인해요.",
-                        action = "지금 확인", onAction = { vm.checkNow(); vm.refreshStatus() },
-                    ) else EmptyState(
-                        Icons.Outlined.Key, "서비스키가 필요해요",
-                        "설정 탭에서 본인의 data.go.kr 서비스키를 입력하면 공고를 모아 드립니다.",
-                        action = "설정으로 가기", onAction = { onGoTab(Tab.SETTINGS) },
-                    )
-                }
-                shown.isEmpty() -> item(key = "filtered") {
-                    EmptyState(
-                        Icons.Outlined.FilterAltOff, "조건에 맞는 공고가 없어요",
-                        "지금 모인 공고는 모두 내 조건으로는 신청이 어려워 보여요. 필터를 끄면 전체를 볼 수 있어요.",
-                        action = "전체 보기", onAction = { onlyMatched = false },
-                    )
-                }
-                else -> items(shown, key = { it.id }) {
-                    NoticeRow(
-                        it, today, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized), matches[it.id],
-                        recommend = if (sort == SortOrder.RECOMMEND) scores[it.id]?.total else null,
-                    ) { onOpen(it.id) }
+                when {
+                    notices.isEmpty() -> item(key = "empty") {
+                        if (vm.hasKey) EmptyState(
+                            Icons.Outlined.Inbox, "아직 수집된 공고가 없어요",
+                            "위의 새로고침(지금 확인)을 누르면 바로 조회합니다. 이후엔 6시간마다 자동으로 확인해요.",
+                            action = "지금 확인", onAction = { vm.checkNow(); vm.refreshStatus() },
+                        ) else EmptyState(
+                            Icons.Outlined.Key, "서비스키가 필요해요",
+                            "설정 탭에서 본인의 data.go.kr 서비스키를 입력하면 공고를 모아 드립니다.",
+                            action = "설정으로 가기", onAction = { onGoTab(Tab.SETTINGS) },
+                        )
+                    }
+                    filtered.isEmpty() -> item(key = "filtered") {
+                        EmptyState(
+                            Icons.Outlined.FilterAltOff, "조건에 맞는 공고가 없어요",
+                            "지금 모인 공고는 모두 내 조건으로는 신청이 어려워 보여요. 필터를 끄면 전체를 볼 수 있어요.",
+                            action = "전체 보기", onAction = { onlyMatched = false },
+                        )
+                    }
+                    shown.isEmpty() -> item(key = "nosearch") {
+                        EmptyState(
+                            Icons.Outlined.SearchOff, "'$query' 검색 결과가 없어요",
+                            "${NoticeSearch.FIELDS_LABEL}에서 찾아요(이 폰에 수집된 공고 안에서만)." +
+                                if (onlyMatched) " '가능·확인 필요만 보기' 필터도 함께 적용 중이에요." else "",
+                            action = "검색어 지우기", onAction = { vm.query = "" },
+                        )
+                    }
+                    else -> items(shown, key = { it.id }) {
+                        NoticeRow(
+                            it, today, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized), matches[it.id],
+                            recommend = if (sort == SortOrder.RECOMMEND) scores[it.id]?.total else null,
+                        ) { onOpen(it.id) }
+                    }
                 }
             }
         }
     }
+}
+
+/** 공고 검색창(v0.10.0~). 입력할 때마다 바로 거른다. */
+@Composable
+private fun SearchField(query: String, onChange: (String) -> Unit) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    OutlinedTextField(
+        value = query, onValueChange = onChange,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+        singleLine = true,
+        placeholder = { Text("단지명·지역·사업주체 검색") },
+        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) IconButton(onClick = { onChange("") }) {
+                Icon(Icons.Outlined.Close, contentDescription = "검색어 지우기")
+            }
+        },
+        shape = RoundedCornerShape(28.dp),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+    )
 }
 
 /** 서비스키 미입력 안내. 키는 각자 data.go.kr에서 받아 넣는다(앱·저장소에 내장하지 않음). */
@@ -627,6 +680,8 @@ internal fun DetailSummaryCard(n: Notice, today: String, cmpet: String) {
             ScheduleLine("모집공고", n.noticeDate)
             if (n.rank1Start.isNotBlank()) ScheduleLine("1순위 접수", "${n.rank1Start} ~ ${n.rank1End}")
             ScheduleLine("당첨자 발표", n.resultDate)
+            if (n.builder.isNotBlank()) ScheduleLine("사업주체", n.builder)
+            if (n.contractor.isNotBlank()) ScheduleLine("시공사", n.contractor)
         }
     }
 }

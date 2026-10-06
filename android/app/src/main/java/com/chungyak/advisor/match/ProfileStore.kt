@@ -3,6 +3,7 @@ package com.chungyak.advisor.match
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.LocalDate
 
 /**
  * 프로필·알림 범위 저장소. 개인정보라 별도 prefs 파일([FILE])에 두고, 서버·백업 파일·로그 어디로도
@@ -13,7 +14,13 @@ class ProfileStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     var profile: Profile
-        get() = prefs.getString(KEY_PROFILE, null)?.let { runCatching { decode(JSONObject(it)) }.getOrNull() } ?: Profile()
+        get() {
+            val stored = prefs.getString(KEY_PROFILE, null)?.let { runCatching { decode(JSONObject(it)) }.getOrNull() } ?: return Profile()
+            // v0.9.0까지 개월 수로 넣은 거주 기간 → 전입일로 한 번 바꿔 저장(이후 날이 지나면 기간이 자동으로 늘어난다).
+            val migrated = migrateResidence(stored, LocalDate.now())
+            if (migrated != stored) prefs.edit().putString(KEY_PROFILE, encode(migrated).toString()).apply()
+            return migrated
+        }
         set(v) = prefs.edit().putString(KEY_PROFILE, encode(v).toString()).apply()
 
     var notifyMode: NotifyMode
@@ -37,8 +44,16 @@ class ProfileStore(context: Context) {
         private const val KEY_MODE = "notify_mode"
         private const val KEY_ONBOARDING_DONE = "onboarding_done"
 
+        /**
+         * 예전 '연속 거주 기간(개월)' N → 전입일 = [today] − N개월(근사값). 오늘 기준 계산하면 N개월 그대로라
+         * 판정 결과가 바뀌지 않는다. 전입일이 이미 있거나 기간이 미입력이면 그대로 둔다.
+         */
+        fun migrateResidence(p: Profile, today: LocalDate): Profile =
+            if (p.residenceSince.isNotBlank() || p.residenceMonths < 0) p
+            else p.copy(residenceSince = today.minusMonths(p.residenceMonths.toLong()).toString(), residenceMonths = -1)
+
         fun encode(p: Profile) = JSONObject()
-            .put("sido", p.sido).put("sigungu", p.sigungu).put("residenceMonths", p.residenceMonths)
+            .put("sido", p.sido).put("residenceSince", p.residenceSince).put("sigungu", p.sigungu).put("residenceMonths", p.residenceMonths)
             .put("householdHead", p.householdHead).put("homesOwned", p.homesOwned)
             .put("everOwned", p.everOwned).put("wonWithin5y", p.wonWithin5y).put("usedSpecial", p.usedSpecial)
             .put("married", p.married).put("marriageYm", p.marriageYm).put("children", p.children)
@@ -53,7 +68,7 @@ class ProfileStore(context: Context) {
             .put("birthDate", p.birthDate).put("homelessSince", p.homelessSince).put("dependents", p.dependents)
 
         fun decode(o: JSONObject) = Profile(
-            sido = o.optString("sido"), sigungu = o.optString("sigungu"),
+            sido = o.optString("sido"), sigungu = o.optString("sigungu"), residenceSince = o.optString("residenceSince"),
             residenceMonths = o.optInt("residenceMonths", -1), householdHead = o.optBoolean("householdHead"),
             homesOwned = o.optInt("homesOwned", 0), everOwned = o.optBoolean("everOwned"),
             wonWithin5y = o.optBoolean("wonWithin5y"), usedSpecial = o.optBoolean("usedSpecial"),

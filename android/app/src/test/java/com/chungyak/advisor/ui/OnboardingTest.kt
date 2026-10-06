@@ -60,8 +60,8 @@ class OnboardingTest {
 
     @Test fun skipResidence_onEmptyProfile_leavesProfileUnset() {
         val start = ProfileDraft.of(Profile(), NotifyMode.ALL)
-        val skipped = Onboarding.skip(start.edit { it.copy(sido = "경기") }.withNum("residenceMonths", "12"), start, FormSection.RESIDENCE)
+        val skipped = Onboarding.skip(start.edit { it.copy(sido = "경기", residenceSince = "2024-03-01") }, start, FormSection.RESIDENCE)
         assertFalse(skipped.build().isSet)
-        assertEquals(-1, skipped.build().residenceMonths)
+        assertEquals("", skipped.build().residenceSince)
     }
 }

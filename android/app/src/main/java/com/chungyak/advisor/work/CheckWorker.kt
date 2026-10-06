@@ -65,9 +65,10 @@ class CheckWorker(
                 if (fresh.isNotEmpty()) {
                     dao.insertAll(if (baseline) fresh.map { it.copy(notified = true) } else fresh)
                 }
-                // 이미 있는 공고도 주택 구분·규제지역은 최신 값으로(v0.4.4 이하 수집분은 houseDtl이 비어 있음).
+                // 이미 있는 공고도 주택 구분·규제지역·사업주체·시공사는 최신 값으로
+                // (v0.4.4 이하 수집분은 houseDtl, v0.9.0 이하 수집분은 사업주체·시공사가 비어 있음).
                 result.notices.filter { it.id in existing }.forEach {
-                    dao.updateMeta(it.id, it.houseDtl, it.speculationArea, it.adjustmentArea)
+                    dao.updateMeta(it.id, it.houseDtl, it.speculationArea, it.adjustmentArea, it.builder, it.contractor)
                 }
                 // 분양가는 목록에 없어 주택형별 상세를 공고별 2차 호출로 받아 캐시한다.
                 // 한 번 받으면 다시 부르지 않고, 실패분만 다음 폴링에서 재시도(쿼터·지연 절약).

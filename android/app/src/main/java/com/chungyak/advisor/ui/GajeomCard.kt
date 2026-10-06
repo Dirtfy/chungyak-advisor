@@ -63,6 +63,7 @@ fun GajeomCard(g: Gajeom.Result, title: String = "내 청약 가점") {
                     LinearProgressIndicator(
                         progress = { (part.score ?: 0).toFloat() / part.max },
                         modifier = Modifier.fillMaxWidth(),
+                        drawStopIndicator = {}, // M3 1.3 트랙 끝 점(stop indicator) 끔
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(

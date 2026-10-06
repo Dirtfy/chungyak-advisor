@@ -188,6 +188,16 @@ class EligibilityTest {
         assertTrue(g.reasons.any { it.contains("2년") })
     }
 
+    /** v0.10.0: 전입일로 넣으면 거주 기간을 공고일 기준으로 계산한다(저장값으로 굳지 않음). */
+    @Test fun residenceSince_countedAtNoticeDate() {
+        val p = seoulHead.copy(residenceSince = "2025-04-01", residenceMonths = -1)
+        val short = Eligibility.evaluate(p, seoulNotice(), listOf(model())) // 공고일 2026-10-01 → 18개월
+        assertTrue(track(short, "일반공급 1순위").reasons.any { it.contains("거주 18개월") })
+        assertTrue(short.notes.any { it.contains("전입일 2025-04-01") })
+        val later = Eligibility.evaluate(p, seoulNotice().copy(noticeDate = "2027-05-01"), listOf(model())) // 25개월
+        assertFalse(track(later, "일반공급 1순위").reasons.any { it.contains("2년 이상 거주") })
+    }
+
     @Test fun gyeonggi_otherCity_isOtherArea() {
         val p = seoulHead.copy(sido = "경기", sigungu = "수원시", depositManwon = 200, householdHead = false)
         val g = track(Eligibility.evaluate(p, gyeonggiNotice(), listOf(model())), "일반공급 1순위")

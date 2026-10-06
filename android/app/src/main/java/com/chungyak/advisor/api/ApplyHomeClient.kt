@@ -255,6 +255,8 @@ object ApplyHomeClient {
             houseDtl = r.optString("HOUSE_DTL_SECD_NM").trim().ifBlank {
                 when (r.optString("HOUSE_DTL_SECD").trim()) { "01" -> "민영"; "03" -> "국민"; else -> "" }
             },
+            builder = r.optString("BSNS_MBY_NM").trim(),
+            contractor = r.optString("CNSTRCT_ENTRPS_NM").trim(),
             url = r.optString("PBLANC_URL"),
             homepage = r.optString("HMPG_ADRES"),
             firstSeen = System.currentTimeMillis(),

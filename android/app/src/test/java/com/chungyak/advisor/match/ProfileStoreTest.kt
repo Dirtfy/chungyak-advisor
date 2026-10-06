@@ -16,7 +16,7 @@ class ProfileStoreTest {
 
     @Test fun roundTrip_keepsEveryField() {
         val p = Profile(
-            sido = "서울", sigungu = "강남구", residenceMonths = 60, householdHead = true, homesOwned = 1,
+            sido = "서울", sigungu = "강남구", residenceSince = "2016-04-01", residenceMonths = 60, householdHead = true, homesOwned = 1,
             everOwned = true, wonWithin5y = true, usedSpecial = true, married = true, marriageYm = "2022-03",
             children = 2, hasNewborn = true, supportsParent = true, account = AccountType.DEPOSIT, accountOpened = "2019-03-15",
             accountMonths = 30, payments = 30, depositManwon = 600, householdSize = 4, incomePct = 120,
@@ -70,6 +70,32 @@ class ProfileStoreTest {
         val store = ProfileStore(ctx)
         assertFalse(com.chungyak.advisor.ui.Onboarding.shouldShow(store.profile, store.onboardingDone))
         assertEquals("2019-03-15", store.profile.accountOpened)
+    }
+
+    /** v0.10.0: 예전 '거주 기간(개월)'은 전입일(오늘 − N개월)로 바뀌고, 오늘 판정 기간은 그대로다. */
+    @Test fun migrateResidence_monthsToDate() {
+        val today = java.time.LocalDate.parse("2026-10-06")
+        val m = ProfileStore.migrateResidence(Profile(sido = "서울", residenceMonths = 30), today)
+        assertEquals("2024-04-06", m.residenceSince)
+        assertEquals(-1, m.residenceMonths)
+        assertEquals(30, m.residenceMonthsAt(today))
+        assertEquals(32, m.residenceMonthsAt(java.time.LocalDate.parse("2026-12-06"))) // 이후로는 자동으로 늘어난다
+        // 전입일이 이미 있거나 기간 미입력이면 그대로
+        val set = Profile(residenceSince = "2020-01-01", residenceMonths = 5)
+        assertEquals(set, ProfileStore.migrateResidence(set, today))
+        assertEquals(Profile(), ProfileStore.migrateResidence(Profile(), today))
+    }
+
+    /** 덮어쓰기 설치: v0.9.0이 저장한 JSON(residenceMonths만)을 읽으면 전입일로 바뀌어 저장된다. */
+    @Test fun oldResidenceMonths_migratedOnRead() {
+        val ctx = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        ctx.getSharedPreferences(ProfileStore.FILE, android.content.Context.MODE_PRIVATE).edit()
+            .putString("profile_v1", """{"sido":"경기","residenceMonths":12,"accountOpened":"2019-03-15"}""").commit()
+        val p = ProfileStore(ctx).profile
+        assertEquals(java.time.LocalDate.now().minusMonths(12).toString(), p.residenceSince)
+        assertEquals(12, p.residenceMonthsAt(java.time.LocalDate.now()))
+        assertEquals("2019-03-15", p.accountOpened)
+        assertEquals(p, ProfileStore(ctx).profile) // 두 번째 읽기에서 또 바뀌지 않는다
     }
 
     /** MDAT_TRGET_AREA_SECD: "N"은 비조정 — 예전엔 비어 있지 않으면 조정으로 봤다. */

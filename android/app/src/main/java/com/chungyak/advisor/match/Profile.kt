@@ -34,7 +34,8 @@ data class Profile(
     // 거주
     val sido: String = "",              // "서울" / "경기" / "인천" / "기타"
     val sigungu: String = "",           // 예: "성남시", "강남구" (해당지역 판단용, 선택)
-    val residenceMonths: Int = -1,      // 현 시·군 연속 거주 기간
+    val residenceSince: String = "",    // 현 거주지 전입일 "yyyy-MM-dd"(v0.10.0~) — 있으면 기간을 이 날짜로 계산(우선)
+    val residenceMonths: Int = -1,      // 연속 거주 기간(개월). v0.9.0까지의 입력값 — 전입일이 없을 때만 사용
     // 세대
     val householdHead: Boolean = false, // 세대주
     val homesOwned: Int = 0,            // 세대 전체 보유 주택 수 (0 = 무주택세대)
@@ -73,6 +74,12 @@ data class Profile(
     val isSet: Boolean get() = sido.isNotBlank()
 
     val homeless: Boolean get() = homesOwned == 0
+
+    /** [asOf] 기준 연속 거주 개월 수. 전입일이 있으면 그걸로 계산하고, 없으면 예전 입력값(-1 = 미입력). */
+    fun residenceMonthsAt(asOf: LocalDate): Int {
+        val since = AccountPeriod.parse(residenceSince) ?: return residenceMonths
+        return AccountPeriod.months(since, asOf).coerceAtLeast(0)
+    }
 
     /** [asOf] 기준 통장 가입 개월 수. 가입 일자가 있으면 그걸로 계산하고, 없으면 직접 입력값(-1 = 미입력). */
     fun accountMonthsAt(asOf: LocalDate): Int {
