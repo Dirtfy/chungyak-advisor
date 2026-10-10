@@ -2,6 +2,7 @@ package com.chungyak.advisor.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,11 +20,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.dp
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.match.NotifyMode
@@ -42,11 +46,22 @@ fun ProfileScreen(
     onSave: (Profile, NotifyMode) -> Unit,
     onClear: () -> Unit,
     onBack: (() -> Unit)? = null,
+    /** 이 묶음으로 바로 스크롤(공고 목록·상세의 '내 자금 입력' 안내에서 들어올 때). 스크롤한 뒤 [onFocused]. */
+    focus: FormSection? = null,
+    onFocused: () -> Unit = {},
 ) {
     if (onBack != null) BackHandler(onBack = onBack)
     // 저장·지우기로 프로필이 바뀌면 입력칸도 새 값으로. 입력칸·검증은 온보딩과 같은 것(ProfileFields, ProfileDraft).
     var draft by remember(initial, initialMode) { mutableStateOf(ProfileDraft.of(initial, initialMode)) }
     var error by remember { mutableStateOf("") }
+    val scroll = rememberScrollState()
+    var focusY by remember { mutableStateOf(-1) }
+    LaunchedEffect(focus, focusY) {
+        if (focus != null && focusY >= 0) {
+            scroll.animateScrollTo(focusY)
+            onFocused()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -57,7 +72,7 @@ fun ProfileScreen(
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
@@ -67,7 +82,10 @@ fun ProfileScreen(
             )
 
             TAB_ORDER.forEach { section ->
-                FormSectionTitle(section.title)
+                Box(if (section == focus) Modifier.onGloballyPositioned { focusY = it.positionInParent().y.toInt() } else Modifier) {
+                    FormSectionTitle(section.title)
+                }
+                if (section == FormSection.FUNDS) Text(section.help, style = MaterialTheme.typography.bodySmall)
                 ProfileFields(section, draft) { draft = it }
             }
 
@@ -92,5 +110,5 @@ fun ProfileScreen(
 /** '내 조건' 탭의 묶음 순서(v0.8.0까지와 같음 — 온보딩 단계 순서와는 다르다). */
 private val TAB_ORDER = listOf(
     FormSection.NOTIFY, FormSection.RESIDENCE, FormSection.HOUSEHOLD, FormSection.FAMILY,
-    FormSection.ACCOUNT, FormSection.GAJEOM, FormSection.INCOME, FormSection.INTEREST,
+    FormSection.ACCOUNT, FormSection.GAJEOM, FormSection.INCOME, FormSection.INTEREST, FormSection.FUNDS,
 )

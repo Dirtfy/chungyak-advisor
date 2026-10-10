@@ -61,7 +61,33 @@ class ProfileDraftTest {
     }
 
     @Test fun numKeysOfSteps_coverAllNumberFields() {
-        assertEquals(ProfileDraft.NUM_KEYS.toSet(), Onboarding.steps.flatMap(Onboarding::numKeys).toSet())
+        // 자금(FUNDS)은 온보딩 단계가 아니라 전체 묶음으로 확인한다.
+        assertEquals(ProfileDraft.NUM_KEYS.toSet(), FormSection.entries.flatMap(Onboarding::numKeys).toSet())
         assertEquals(ProfileDraft.NUM_KEYS.toSet(), ProfileDraft.of(Profile(), NotifyMode.ALL).nums.keys)
+    }
+
+    @Test fun funds_numbersAndDecimalRate() {
+        val d = ProfileDraft.of(Profile(sido = "서울"), NotifyMode.ALL)
+        assertEquals("4", d.num("loanRatePct"))
+        assertEquals("30", d.num("loanYears"))
+        assertEquals("", d.num("cashManwon"))
+        val e = d.withNum("cashManwon", "30,000").withDecimal("loanRatePct", "3.5.2a").withNum("monthlyCapManwon", "200")
+        val b = e.build()
+        assertEquals(30_000, b.cashManwon)
+        assertEquals(3.52, b.loanRatePct, 1e-9)
+        assertEquals(200, b.monthlyCapManwon)
+        assertEquals(-1, b.loanLimitManwon)
+        // 비운 가정값은 기본값
+        assertEquals(Profile.DEFAULT_LOAN_YEARS, e.withNum("loanYears", "").build().loanYears)
+        assertEquals(Profile.DEFAULT_LOAN_RATE, e.withDecimal("loanRatePct", "").build().loanRatePct, 0.0)
+    }
+
+    @Test fun funds_badAssumptions_areProblems() {
+        val d = ProfileDraft.of(Profile(sido = "서울"), NotifyMode.ALL)
+        fun probs(f: (ProfileDraft) -> ProfileDraft) = f(d).problems(today).map { it.section }
+        assertEquals(listOf(FormSection.FUNDS), probs { it.withNum("loanYears", "0") })
+        assertEquals(listOf(FormSection.FUNDS), probs { it.withDecimal("loanRatePct", "45") })
+        assertEquals(listOf(FormSection.FUNDS), probs { it.withNum("downPaymentPct", "120") })
+        assertTrue(probs { it.withNum("cashManwon", "30000") }.isEmpty())
     }
 }

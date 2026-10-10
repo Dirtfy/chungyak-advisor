@@ -23,6 +23,8 @@ class ProfileStoreTest {
             dualIncome = true, realEstateManwon = 20_000, taxYears5 = true, interestSido = setOf("서울", "경기"),
             maxPriceManwon = 120_000, minAreaM2 = 59, maxAreaM2 = 85,
             birthDate = "1990-02-03", homelessSince = "2020-05-06", dependents = 3,
+            cashManwon = 30_000, loanLimitManwon = 50_000, monthlyCapManwon = 200, loanRatePct = 3.75, loanYears = 40,
+            repayment = Repayment.EQUAL_PRINCIPAL, downPaymentPct = 20,
         )
         assertEquals(p, ProfileStore.decode(JSONObject(ProfileStore.encode(p).toString())))
         assertFalse(ProfileStore.decode(JSONObject()).isSet)
@@ -104,5 +106,20 @@ class ProfileStoreTest {
         assertFalse(ApplyHomeClient.adjustment("N"))
         assertFalse(ApplyHomeClient.adjustment(""))
         assertFalse(ApplyHomeClient.adjustment(" n "))
+    }
+
+    /** v0.10.0까지 저장된 프로필(자금 항목 없음) → 자금 미입력 + 기본 가정값. 다른 값은 그대로. */
+    @Test fun v0100Json_fundsDefaults() {
+        val p = ProfileStore.decode(JSONObject("""{"sido":"경기","homesOwned":0,"maxPriceManwon":90000}"""))
+        assertEquals("경기", p.sido)
+        assertEquals(90_000, p.maxPriceManwon)
+        assertEquals(-1, p.cashManwon)
+        assertEquals(-1, p.loanLimitManwon)
+        assertEquals(-1, p.monthlyCapManwon)
+        assertEquals(Profile.DEFAULT_LOAN_RATE, p.loanRatePct, 0.0)
+        assertEquals(Profile.DEFAULT_LOAN_YEARS, p.loanYears)
+        assertEquals(Repayment.ANNUITY, p.repayment)
+        assertEquals(Profile.DEFAULT_DOWN_PCT, p.downPaymentPct)
+        assertFalse(Affordability.isSet(p))
     }
 }

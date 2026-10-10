@@ -37,6 +37,7 @@ import com.chungyak.advisor.match.AccountType
 import com.chungyak.advisor.match.Gajeom
 import com.chungyak.advisor.match.NotifyMode
 import com.chungyak.advisor.match.Profile
+import com.chungyak.advisor.match.Repayment
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -148,6 +149,27 @@ fun ProfileFields(section: FormSection, d: ProfileDraft, onChange: (ProfileDraft
                 Column(Modifier.weight(1f)) { num("minAreaM2", "전용 최소(㎡)") }
                 Column(Modifier.weight(1f)) { num("maxAreaM2", "전용 최대(㎡)") }
             }
+        }
+
+        FormSection.FUNDS -> {
+            num("cashManwon", "보유 현금·가용 자본(만원) — 예: 30000 = 3억")
+            num("loanLimitManwon", "대출 가능 한도(만원, 은행·앱에서 조회한 금액)")
+            num("monthlyCapManwon", "대출 시 월 상환액 상한(만원) — 매달 이만큼까지 낼 수 있음")
+            Text("계산 가정(바꿀 수 있어요)", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = d.num("loanRatePct"),
+                    onValueChange = { onChange(d.withDecimal("loanRatePct", it)) },
+                    label = { Text("대출 금리(연 %)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f),
+                )
+                Column(Modifier.weight(1f)) { num("loanYears", "상환 기간(년)") }
+            }
+            Chips(Repayment.entries, p.repayment, { it.label }) { v -> edit { it.copy(repayment = v) } }
+            num("downPaymentPct", "계약금 비율(%) — 현금으로 낼 몫, 보통 10~20")
+            BudgetSummary(d.build())
         }
     }
 }

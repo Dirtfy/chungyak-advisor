@@ -69,6 +69,14 @@ data class Profile(
     val maxPriceManwon: Int = -1,
     val minAreaM2: Int = -1,            // 전용면적
     val maxAreaM2: Int = -1,
+    // 자금(v0.11.0~, 선택) — 매매 가능 판정(Affordability)용. 금액은 만원, -1 = 미입력.
+    val cashManwon: Int = -1,           // 지금 쓸 수 있는 현금(가용 자본). 이게 있어야 판정한다
+    val loanLimitManwon: Int = -1,      // 대출 가능 한도(은행 상담·앱 조회 금액)
+    val monthlyCapManwon: Int = -1,     // 대출 시 월 상환액 상한(사용자가 정함)
+    val loanRatePct: Double = DEFAULT_LOAN_RATE, // 가정: 연 금리(%)
+    val loanYears: Int = DEFAULT_LOAN_YEARS,     // 가정: 상환 기간(년)
+    val repayment: Repayment = Repayment.ANNUITY, // 가정: 상환 방식
+    val downPaymentPct: Int = DEFAULT_DOWN_PCT,  // 가정: 계약금 비율(%) — 현금으로 내야 하는 몫
 ) {
     /** 프로필을 저장했는가(거주 시·도는 필수 항목). 아니면 매칭하지 않고 모든 공고를 알린다. */
     val isSet: Boolean get() = sido.isNotBlank()
@@ -85,5 +93,11 @@ data class Profile(
     fun accountMonthsAt(asOf: LocalDate): Int {
         val opened = AccountPeriod.parse(accountOpened) ?: return accountMonths
         return AccountPeriod.months(opened, asOf).coerceAtLeast(0)
+    }
+
+    companion object {
+        const val DEFAULT_LOAN_RATE = 4.0
+        const val DEFAULT_LOAN_YEARS = 30
+        const val DEFAULT_DOWN_PCT = 10
     }
 }

@@ -9,8 +9,11 @@ import java.time.LocalDate
  */
 object Onboarding {
 
-    /** 단계 = 입력 묶음. 순서: 거주 → 세대/주택 → 가족 → 통장 → 소득/자산 → 가점 → 관심 → 알림. */
-    val steps: List<FormSection> = FormSection.entries
+    /**
+     * 단계 = 입력 묶음. 순서: 거주 → 세대/주택 → 가족 → 통장 → 소득/자산 → 가점 → 관심 → 알림.
+     * 자금(v0.11.0~)은 선택 항목이라 온보딩에 넣지 않는다 — '내 조건' 탭·공고 목록 안내에서 입력.
+     */
+    val steps: List<FormSection> = FormSection.entries - FormSection.FUNDS
 
     /**
      * 자동으로 띄울지. 프로필이 이미 있으면(기존 사용자) 띄우지 않고, 한 번 끝내거나 '나중에 하기'를 누른 뒤에도
@@ -47,6 +50,7 @@ object Onboarding {
             FormSection.INCOME -> p.copy(dualIncome = o.dualIncome, taxYears5 = o.taxYears5)
             FormSection.GAJEOM -> p.copy(birthDate = o.birthDate, homelessSince = o.homelessSince)
             FormSection.INTEREST -> p.copy(interestSido = o.interestSido)
+            FormSection.FUNDS -> p.copy(repayment = o.repayment)
             FormSection.NOTIFY -> p
         }
         return draft.copy(
@@ -64,6 +68,7 @@ object Onboarding {
         FormSection.INCOME -> listOf("householdSize", "incomePct", "realEstateManwon")
         FormSection.GAJEOM -> listOf("dependents")
         FormSection.INTEREST -> listOf("maxPriceManwon", "minAreaM2", "maxAreaM2")
+        FormSection.FUNDS -> listOf("cashManwon", "loanLimitManwon", "monthlyCapManwon", "loanRatePct", "loanYears", "downPaymentPct")
         FormSection.NOTIFY -> emptyList()
     }
 }

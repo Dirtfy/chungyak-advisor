@@ -11,6 +11,7 @@ import com.chungyak.advisor.data.AppDatabase
 import com.chungyak.advisor.data.CompetitionPolicy
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
+import com.chungyak.advisor.match.Affordability
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.match.NotifyMode
 import com.chungyak.advisor.match.ProfileStore
@@ -89,7 +90,8 @@ class CheckWorker(
                         candidates.associate { it.id to Eligibility.evaluate(profile, it, models[it.id].orEmpty()) }
                     else emptyMap()
                     val toNotify = candidates.filter { Eligibility.shouldNotify(profile, mode, results[it.id]) }
-                    Notifier.notifyNew(applicationContext, toNotify, results)
+                    val funds = toNotify.mapNotNull { n -> Affordability.evaluate(profile, n, models[n.id].orEmpty())?.let { n.id to it } }.toMap()
+                    Notifier.notifyNew(applicationContext, toNotify, results, funds)
                     dao.markNotified(fresh.map { it.id })
                     if (profile.isSet && mode != NotifyMode.ALL) matchNote = " · 맞춤 알림 ${toNotify.size}건"
                 }

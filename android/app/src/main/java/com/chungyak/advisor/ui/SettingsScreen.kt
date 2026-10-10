@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -48,12 +49,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.chungyak.advisor.BuildConfig
 import com.chungyak.advisor.data.Settings
+import com.chungyak.advisor.match.Affordability
 import com.chungyak.advisor.update.UpdateViewModel
 
-/** 설정 탭(리디자인 3단계, docs/11): 서비스키 → 수집 범위 → 알림 → 내 조건 → 백업 → 앱 정보, 섹션마다 흰 카드. */
+/** 설정 탭(리디자인 3단계, docs/11): 서비스키 → 수집 범위 → 알림 → 내 조건 → 내 자금 → 백업 → 앱 정보, 섹션마다 흰 카드. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: NoticeViewModel, onEditProfile: () -> Unit = {}) {
+fun SettingsScreen(vm: NoticeViewModel, onEditProfile: () -> Unit = {}, onEditFunds: () -> Unit = {}) {
+    val profile by vm.profile.collectAsState()
     Scaffold(topBar = { TopAppBar(title = { Text("설정") }) }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
@@ -117,6 +120,16 @@ fun SettingsScreen(vm: NoticeViewModel, onEditProfile: () -> Unit = {}) {
                     OutlinedButton(onClick = vm::openOnboarding) { Text("온보딩 다시 하기") }
                     TextButton(onClick = onEditProfile) { Text("내 조건 탭에서 고치기") }
                 }
+            }
+            SettingsSection(Icons.Outlined.AccountBalanceWallet, "내 자금(매매 가능 판정)") {
+                Text(
+                    "보유 현금·대출 한도·월 상환액 상한으로 공고마다 살 수 있는지(가능/빠듯/불가) 보여 드립니다. " +
+                        "입력값 기반 추정이며 실제 대출 심사와 다를 수 있어요. 이 폰 안에만 저장됩니다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                BudgetSummary(profile)
+                OutlinedButton(onClick = onEditFunds) { Text(if (Affordability.isSet(profile)) "자금 고치기" else "자금 입력하기") }
             }
             SettingsSection(Icons.Outlined.Info, "데이터·앱 정보") {
                 Text("백업 (재설치·기기 변경 시 데이터 옮기기)", style = MaterialTheme.typography.bodyMedium)

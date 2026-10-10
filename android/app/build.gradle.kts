@@ -8,7 +8,7 @@ plugins {
 }
 
 // 앱 버전. versionCode는 여기서 계산(major*10000 + minor*100 + patch) → 릴리스마다 단조 증가.
-val appVersion = "0.10.0"
+val appVersion = "0.11.0"
 val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
 
 // 고정 서명 키: 저장소 밖(../../signing)에 영속 보관, 절대 커밋 금지.

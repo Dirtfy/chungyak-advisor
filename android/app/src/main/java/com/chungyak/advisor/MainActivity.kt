@@ -94,8 +94,12 @@ import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.map.LocationCard
 import com.chungyak.advisor.match.AccountPeriod
+import com.chungyak.advisor.match.Affordability
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.match.Gajeom
+import com.chungyak.advisor.ui.FormSection
+import com.chungyak.advisor.ui.FundsCard
+import com.chungyak.advisor.ui.FundsLine
 import com.chungyak.advisor.ui.GajeomCard
 import java.time.LocalDate
 import com.chungyak.advisor.ui.CompetitionFormat
@@ -147,6 +151,9 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     val selected = notices.firstOrNull { it.id == selectedId }
     val profile by vm.profile.collectAsState()
     val matches by vm.matches.collectAsState()
+    // '내 자금 입력' 안내에서 들어오면 내 조건 탭의 자금 묶음으로 바로 스크롤.
+    var profileFocus by remember { mutableStateOf<FormSection?>(null) }
+    val openFunds = { profileFocus = FormSection.FUNDS; tab = Tab.PROFILE }
 
     // 첫 실행(내 조건 없음) 온보딩 — 탭 바 없이 전체 화면. 끝나면 서비스키가 없을 때 설정 탭으로.
     if (vm.showOnboarding) {
@@ -165,7 +172,10 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     // 상세는 탭 바 없이 전체 화면(지도·본문 영역을 넓게).
     if (selected != null) {
         BackHandler { selectedId = null }
-        NoticeDetailScreen(selected, vm, matches[selected.id], onBack = { selectedId = null })
+        NoticeDetailScreen(
+            selected, vm, matches[selected.id], onBack = { selectedId = null },
+            onEditFunds = { selectedId = null; openFunds() },
+        )
         return
     }
     // 다른 탭에서 뒤로 가기 → 공고 탭.
@@ -187,13 +197,14 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (tab) {
-                Tab.NOTICES -> NoticesTab(vm, notices, onOpen = { selectedId = it }, onGoTab = { tab = it })
+                Tab.NOTICES -> NoticesTab(vm, notices, onOpen = { selectedId = it }, onGoTab = { tab = it }, onOpenFunds = openFunds)
                 Tab.PROFILE -> ProfileScreen(
                     initial = profile, initialMode = vm.notifyMode,
                     onSave = { p, m -> vm.saveProfile(p, m); tab = Tab.NOTICES },
                     onClear = { vm.clearProfile() },
+                    focus = profileFocus, onFocused = { profileFocus = null },
                 )
-                Tab.SETTINGS -> SettingsScreen(vm, onEditProfile = { tab = Tab.PROFILE })
+                Tab.SETTINGS -> SettingsScreen(vm, onEditProfile = { tab = Tab.PROFILE }, onEditFunds = openFunds)
             }
         }
     }
@@ -205,12 +216,19 @@ private fun HomeScreen(vm: NoticeViewModel = viewModel()) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (String) -> Unit, onGoTab: (Tab) -> Unit) {
+private fun NoticesTab(
+    vm: NoticeViewModel,
+    notices: List<Notice>,
+    onOpen: (String) -> Unit,
+    onGoTab: (Tab) -> Unit,
+    onOpenFunds: () -> Unit,
+) {
     val status by vm.status.collectAsState()
     val sort by vm.sort.collectAsState()
     val profile by vm.profile.collectAsState()
     val matches by vm.matches.collectAsState()
     val scores by vm.scores.collectAsState()
+    val funds by vm.funds.collectAsState()
     val today = vm.today()
     var onlyMatched by rememberSaveable { mutableStateOf(false) }
     val filtered = if (onlyMatched && profile.isSet)
@@ -262,6 +280,9 @@ private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (Stri
                         } else {
                             TextButton(onClick = { onGoTab(Tab.PROFILE) }) { Text("내 조건을 입력하면 맞는 공고만 알려 드려요 〉") }
                         }
+                        if (notices.isNotEmpty() && !Affordability.isSet(profile)) {
+                            TextButton(onClick = onOpenFunds) { Text("내 자금을 넣으면 공고마다 살 수 있는지 보여 드려요 〉") }
+                        }
                         SortBar(sort, vm::setSort)
                         if (sort == SortOrder.RECOMMEND) Text(
                             "추천 점수(100) = 내 조건 판정 40 + 가점 20 + 경쟁률(낮을수록) 25 + 분양가 상한 적합 15. " +
@@ -303,6 +324,7 @@ private fun NoticesTab(vm: NoticeViewModel, notices: List<Notice>, onOpen: (Stri
                         NoticeRow(
                             it, today, CompetitionFormat.summary(it, today, vm.cmpetUnauthorized), matches[it.id],
                             recommend = if (sort == SortOrder.RECOMMEND) scores[it.id]?.total else null,
+                            funds = funds[it.id],
                         ) { onOpen(it.id) }
                     }
                 }
@@ -406,6 +428,8 @@ internal fun NoticeRow(
     match: Eligibility.Result?,
     /** 추천순일 때만: 추천 점수(0~100). */
     recommend: Int? = null,
+    /** 내 자금 판정(자금을 입력했고 분양가가 있을 때만). */
+    funds: Affordability.NoticeResult? = null,
     onClick: () -> Unit,
 ) {
     Card(
@@ -450,12 +474,16 @@ internal fun NoticeRow(
                 Spacer(Modifier.height(10.dp))
                 MatchLine(match)
             }
+            if (funds != null) {
+                Spacer(Modifier.height(if (match != null) 6.dp else 10.dp))
+                FundsLine(funds)
+            }
         }
     }
 }
 
 @Composable
-private fun Pill(text: String, bg: Color, fg: Color) {
+internal fun Pill(text: String, bg: Color, fg: Color) {
     Text(
         text,
         style = MaterialTheme.typography.labelMedium,
@@ -481,7 +509,13 @@ private fun priceSummary(n: Notice): String =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibility.Result?, onBack: () -> Unit) {
+private fun NoticeDetailScreen(
+    n: Notice,
+    vm: NoticeViewModel,
+    match: Eligibility.Result?,
+    onBack: () -> Unit,
+    onEditFunds: () -> Unit,
+) {
     val models by remember(n.id) { vm.models(n.id) }.collectAsState(initial = emptyList())
     val cmpets by remember(n.id) { vm.competitions(n.id) }.collectAsState(initial = emptyList())
     val cmpetSummary = CompetitionFormat.summary(n, vm.today(), vm.cmpetUnauthorized)
@@ -505,6 +539,7 @@ private fun NoticeDetailScreen(n: Notice, vm: NoticeViewModel, match: Eligibilit
             modifier = Modifier.fillMaxSize().padding(padding),
             onOpenNotice = { runCatching { uri.openUri(n.url) } },
             location = { LocationCard(n.name, n.address) },
+            funds = { FundsCard(n, models, profile, onEdit = onEditFunds) },
         )
     }
 }
@@ -526,6 +561,8 @@ internal fun NoticeDetailBody(
     scroll: ScrollState = rememberScrollState(),
     onOpenNotice: () -> Unit = {},
     location: @Composable () -> Unit,
+    /** 내 자금 판정 카드(분양가 카드 바로 위). */
+    funds: @Composable () -> Unit = {},
 ) {
     Column(
         modifier.padding(horizontal = 16.dp).verticalScroll(scroll),
@@ -536,6 +573,7 @@ internal fun NoticeDetailBody(
         location()
         if (match != null) MatchCard(match)
         if (gajeom != null) GajeomCard(gajeom, title = "이 공고 기준 내 가점")
+        funds()
         PriceCard(n, models)
         CompetitionCard(cmpetSummary, cmpets)
         Text(
@@ -571,7 +609,7 @@ private fun SectionCard(title: String, value: String? = null, content: @Composab
 }
 
 @Composable
-private fun Caption(text: String) {
+internal fun Caption(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

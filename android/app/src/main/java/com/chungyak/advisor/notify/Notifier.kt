@@ -11,7 +11,9 @@ import androidx.core.app.NotificationManagerCompat
 import com.chungyak.advisor.MainActivity
 import com.chungyak.advisor.R
 import com.chungyak.advisor.data.Notice
+import com.chungyak.advisor.match.Affordability
 import com.chungyak.advisor.match.Eligibility
+import com.chungyak.advisor.ui.FundsFormat
 import com.chungyak.advisor.ui.PriceFormat
 
 /**
@@ -113,6 +115,7 @@ object Notifier {
         context: Context,
         newNotices: List<Notice>,
         matches: Map<String, Eligibility.Result> = emptyMap(),
+        funds: Map<String, Affordability.NoticeResult> = emptyMap(),
     ) {
         if (newNotices.isEmpty()) return
         ensureChannel(context)
@@ -133,7 +136,8 @@ object Notifier {
                 " · 분양가 ${PriceFormat.range(n.priceMinManwon, n.priceMaxManwon)}" else ""
             // 밴드에는 제목+본문 한 줄이 보인다. 상세(주소·세대수·분양가)는 폰의 펼친 알림에.
             val m = matches[n.id]
-            val mine = m?.let { "\n내 조건: ${it.verdict.label} — ${it.summary}" }.orEmpty()
+            val mine = m?.let { "\n내 조건: ${it.verdict.label} — ${it.summary}" }.orEmpty() +
+                funds[n.id]?.let { "\n내 자금: ${FundsFormat.summary(it)}" }.orEmpty()
             val notif = base(context, contentIntent)
                 .setContentTitle(if (m != null) shortTitle(n.name, prefix = "맞춤 청약 ") else shortTitle(n.name))
                 .setContentText("${n.areaName} · $schedule")

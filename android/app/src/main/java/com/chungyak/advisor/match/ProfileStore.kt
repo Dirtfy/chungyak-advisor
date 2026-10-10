@@ -66,6 +66,9 @@ class ProfileStore(context: Context) {
             .put("taxYears5", p.taxYears5).put("interestSido", JSONArray(p.interestSido.toList()))
             .put("maxPriceManwon", p.maxPriceManwon).put("minAreaM2", p.minAreaM2).put("maxAreaM2", p.maxAreaM2)
             .put("birthDate", p.birthDate).put("homelessSince", p.homelessSince).put("dependents", p.dependents)
+            .put("cashManwon", p.cashManwon).put("loanLimitManwon", p.loanLimitManwon).put("monthlyCapManwon", p.monthlyCapManwon)
+            .put("loanRatePct", p.loanRatePct).put("loanYears", p.loanYears).put("repayment", p.repayment.name)
+            .put("downPaymentPct", p.downPaymentPct)
 
         fun decode(o: JSONObject) = Profile(
             sido = o.optString("sido"), sigungu = o.optString("sigungu"), residenceSince = o.optString("residenceSince"),
@@ -84,6 +87,12 @@ class ProfileStore(context: Context) {
             maxAreaM2 = o.optInt("maxAreaM2", -1),
             birthDate = o.optString("birthDate"), homelessSince = o.optString("homelessSince"),
             dependents = o.optInt("dependents", -1),
+            cashManwon = o.optInt("cashManwon", -1), loanLimitManwon = o.optInt("loanLimitManwon", -1),
+            monthlyCapManwon = o.optInt("monthlyCapManwon", -1),
+            loanRatePct = o.optDouble("loanRatePct", Profile.DEFAULT_LOAN_RATE).takeUnless { it.isNaN() } ?: Profile.DEFAULT_LOAN_RATE,
+            loanYears = o.optInt("loanYears", Profile.DEFAULT_LOAN_YEARS),
+            repayment = Repayment.of(o.optString("repayment")),
+            downPaymentPct = o.optInt("downPaymentPct", Profile.DEFAULT_DOWN_PCT),
         )
     }
 }

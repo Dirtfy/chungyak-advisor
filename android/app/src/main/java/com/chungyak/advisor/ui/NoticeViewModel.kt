@@ -11,6 +11,7 @@ import com.chungyak.advisor.data.Competition
 import com.chungyak.advisor.data.HouseModel
 import com.chungyak.advisor.data.Notice
 import com.chungyak.advisor.data.Settings
+import com.chungyak.advisor.match.Affordability
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.match.NotifyMode
 import com.chungyak.advisor.match.Profile
@@ -52,6 +53,16 @@ class NoticeViewModel(app: Application) : AndroidViewModel(app) {
             if (!p.isSet) emptyMap() else {
                 val byNotice = models.groupBy { it.noticeId }
                 list.associate { it.id to Eligibility.evaluate(p, it, byNotice[it.id].orEmpty()) }
+            }
+        }.flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /** 공고별 자금 판정(v0.11.0~). 자금(보유 현금)을 넣지 않았거나 분양가 정보가 없는 공고는 빠진다. */
+    val funds: StateFlow<Map<String, Affordability.NoticeResult>> =
+        combine(dao.observeAll(), db.houseModelDao().observeAll(), _profile) { list, models, p ->
+            if (!Affordability.isSet(p)) emptyMap() else {
+                val byNotice = models.groupBy { it.noticeId }
+                list.mapNotNull { n -> Affordability.evaluate(p, n, byNotice[n.id].orEmpty())?.let { n.id to it } }.toMap()
             }
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())

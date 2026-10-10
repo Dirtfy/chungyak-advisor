@@ -40,6 +40,11 @@ enum class FormSection(val title: String, val help: String) {
         "관심 조건(선택 — 비우면 전체)",
         "관심 있는 지역·가격·면적만 골라 알림과 추천에 씁니다. 비워 두면 모든 공고가 대상입니다.",
     ),
+    FUNDS(
+        "자금(매매 가능 판정, 선택)",
+        "지금 쓸 수 있는 현금과 대출로 분양가를 낼 수 있는지 공고마다 보여 줍니다. 실제 쓸 대출 = 대출 한도와 " +
+            "월 상환액 상한으로 갚을 수 있는 원금 중 작은 쪽. 은행 대출 심사(LTV·DSR)가 아닌 입력값 기반 추정이에요.",
+    ),
     NOTIFY(
         "알림 범위",
         "새 공고를 어디까지 알릴지 고릅니다. '확인 필요' = 입력이 부족하거나 공고문 확인이 필요한 경우.",
@@ -62,6 +67,14 @@ data class ProfileDraft(
 
     fun withNum(key: String, raw: String) = copy(nums = nums + (key to raw.filter { it.isDigit() }.take(7)))
 
+    /** 소수점 하나까지 받는 칸(대출 금리 %). */
+    fun withDecimal(key: String, raw: String): ProfileDraft {
+        val digits = raw.filter { it.isDigit() || it == '.' }
+        val dot = digits.indexOf('.')
+        val clean = if (dot < 0) digits else digits.substring(0, dot + 1) + digits.substring(dot + 1).replace(".", "")
+        return copy(nums = nums + (key to clean.take(5)))
+    }
+
     fun edit(f: (Profile) -> Profile) = copy(profile = f(profile))
 
     fun build(): Profile {
@@ -72,6 +85,10 @@ data class ProfileDraft(
             householdSize = n("householdSize"), incomePct = n("incomePct"), realEstateManwon = n("realEstateManwon"),
             maxPriceManwon = n("maxPriceManwon"), minAreaM2 = n("minAreaM2"), maxAreaM2 = n("maxAreaM2"),
             dependents = n("dependents"),
+            cashManwon = n("cashManwon"), loanLimitManwon = n("loanLimitManwon"), monthlyCapManwon = n("monthlyCapManwon"),
+            loanRatePct = nums["loanRatePct"]?.toDoubleOrNull() ?: Profile.DEFAULT_LOAN_RATE,
+            loanYears = n("loanYears", Profile.DEFAULT_LOAN_YEARS),
+            downPaymentPct = n("downPaymentPct", Profile.DEFAULT_DOWN_PCT),
         )
     }
 
@@ -87,6 +104,9 @@ data class ProfileDraft(
             if (b.accountOpened.isNotBlank() && AccountPeriod.parse(b.accountOpened).let { it == null || it.isAfter(today) })
                 add(FormProblem(FormSection.ACCOUNT, "청약통장 가입 일자가 올바르지 않습니다(미래 날짜 불가)."))
             if (b.dependents > 20) add(FormProblem(FormSection.GAJEOM, "부양가족 수가 너무 큽니다."))
+            if (b.loanRatePct > 30) add(FormProblem(FormSection.FUNDS, "대출 금리는 0~30% 사이로 넣어 주세요."))
+            if (b.loanYears !in 1..50) add(FormProblem(FormSection.FUNDS, "상환 기간은 1~50년 사이로 넣어 주세요."))
+            if (b.downPaymentPct > 100) add(FormProblem(FormSection.FUNDS, "계약금 비율은 0~100% 사이로 넣어 주세요."))
         }
     }
 
@@ -94,6 +114,7 @@ data class ProfileDraft(
         val NUM_KEYS = listOf(
             "homesOwned", "children", "accountMonths", "payments", "depositManwon",
             "householdSize", "incomePct", "realEstateManwon", "maxPriceManwon", "minAreaM2", "maxAreaM2", "dependents",
+            "cashManwon", "loanLimitManwon", "monthlyCapManwon", "loanRatePct", "loanYears", "downPaymentPct",
         )
 
         fun of(p: Profile, mode: NotifyMode): ProfileDraft {
@@ -105,8 +126,11 @@ data class ProfileDraft(
                 "realEstateManwon" to p.realEstateManwon, "maxPriceManwon" to p.maxPriceManwon,
                 "minAreaM2" to p.minAreaM2, "maxAreaM2" to p.maxAreaM2,
                 "dependents" to p.dependents,
+                "cashManwon" to p.cashManwon, "loanLimitManwon" to p.loanLimitManwon, "monthlyCapManwon" to p.monthlyCapManwon,
+                "loanYears" to p.loanYears, "downPaymentPct" to p.downPaymentPct,
             )
-            return ProfileDraft(p, values.mapValues { (_, v) -> if (v >= 0) v.toString() else "" }, mode)
+            val rate = p.loanRatePct.toString().removeSuffix(".0")
+            return ProfileDraft(p, values.mapValues { (_, v) -> if (v >= 0) v.toString() else "" } + ("loanRatePct" to rate), mode)
         }
     }
 }
