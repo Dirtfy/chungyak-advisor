@@ -35,8 +35,10 @@ import androidx.compose.ui.unit.dp
 import com.chungyak.advisor.match.AccountPeriod
 import com.chungyak.advisor.match.AccountType
 import com.chungyak.advisor.match.Gajeom
+import com.chungyak.advisor.match.LoanRules
 import com.chungyak.advisor.match.NotifyMode
 import com.chungyak.advisor.match.Profile
+import com.chungyak.advisor.match.RateType
 import com.chungyak.advisor.match.Repayment
 import java.time.Instant
 import java.time.LocalDate
@@ -153,8 +155,22 @@ fun ProfileFields(section: FormSection, d: ProfileDraft, onChange: (ProfileDraft
 
         FormSection.FUNDS -> {
             num("cashManwon", "보유 현금·가용 자본(만원) — 예: 30000 = 3억")
-            num("loanLimitManwon", "대출 가능 한도(만원, 은행·앱에서 조회한 금액)")
-            num("monthlyCapManwon", "대출 시 월 상환액 상한(만원) — 매달 이만큼까지 낼 수 있음")
+            num("incomeManwon", "연소득(만원, 세전·부부 공동 대출이면 합산) — DSR 계산")
+            num("debtAnnualManwon", "기존 대출의 1년 원리금 상환액(만원, 없으면 비움)")
+            val homes = d.num("homesOwned").toIntOrNull() ?: 0
+            if (homes == 1) SwitchRow("기존 집을 6개월 안에 팔 조건으로 대출(처분조건부)", p.sellingHome) { v -> edit { it.copy(sellingHome = v) } }
+            Text(
+                "주택 수·생애최초는 '세대·주택' 입력으로 판단: 지금 " + when {
+                    homes >= 2 -> "다주택 → 수도권·규제지역 구입 주담대 불가"
+                    homes == 1 -> if (p.sellingHome) "처분조건부 1주택 → 무주택과 같은 LTV" else "1주택 → 수도권·규제지역 추가 구입 주담대 불가"
+                    !p.everOwned -> "무주택 생애최초 → LTV 70%"
+                    else -> "무주택 → 규제지역 LTV 40%(서민·실수요자 60%), 비규제 70%"
+                } + ". 규제지역 여부는 공고마다 자동으로 판별해요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            num("loanLimitManwon", "은행에서 조회한 대출 한도(만원, 선택)")
+            num("monthlyCapManwon", "월 상환액 상한(만원, 선택) — 매달 이만큼까지 낼 수 있음")
             Text("계산 가정(바꿀 수 있어요)", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -167,7 +183,11 @@ fun ProfileFields(section: FormSection, d: ProfileDraft, onChange: (ProfileDraft
                 )
                 Column(Modifier.weight(1f)) { num("loanYears", "상환 기간(년)") }
             }
+            Text("상환 방식", style = MaterialTheme.typography.bodyMedium)
             Chips(Repayment.entries, p.repayment, { it.label }) { v -> edit { it.copy(repayment = v) } }
+            if (p.repayment != Repayment.BULLET) num("graceYears", "거치기간(년, 이자만 내는 기간 — 보통 0~${LoanRules.MAX_GRACE_YEARS})")
+            Text("금리 유형(스트레스 DSR 가산 비율이 달라요)", style = MaterialTheme.typography.bodyMedium)
+            Chips(RateType.entries, p.rateType, { it.label }) { v -> edit { it.copy(rateType = v) } }
             num("downPaymentPct", "계약금 비율(%) — 현금으로 낼 몫, 보통 10~20")
             BudgetSummary(d.build())
         }

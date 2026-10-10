@@ -69,6 +69,8 @@ class ProfileStore(context: Context) {
             .put("cashManwon", p.cashManwon).put("loanLimitManwon", p.loanLimitManwon).put("monthlyCapManwon", p.monthlyCapManwon)
             .put("loanRatePct", p.loanRatePct).put("loanYears", p.loanYears).put("repayment", p.repayment.name)
             .put("downPaymentPct", p.downPaymentPct)
+            .put("incomeManwon", p.incomeManwon).put("debtAnnualManwon", p.debtAnnualManwon)
+            .put("rateType", p.rateType.name).put("graceYears", p.graceYears).put("sellingHome", p.sellingHome)
 
         fun decode(o: JSONObject) = Profile(
             sido = o.optString("sido"), sigungu = o.optString("sigungu"), residenceSince = o.optString("residenceSince"),
@@ -93,6 +95,9 @@ class ProfileStore(context: Context) {
             loanYears = o.optInt("loanYears", Profile.DEFAULT_LOAN_YEARS),
             repayment = Repayment.of(o.optString("repayment")),
             downPaymentPct = o.optInt("downPaymentPct", Profile.DEFAULT_DOWN_PCT),
+            incomeManwon = o.optInt("incomeManwon", -1), debtAnnualManwon = o.optInt("debtAnnualManwon", -1),
+            rateType = RateType.of(o.optString("rateType")), graceYears = o.optInt("graceYears", 0),
+            sellingHome = o.optBoolean("sellingHome"),
         )
     }
 }

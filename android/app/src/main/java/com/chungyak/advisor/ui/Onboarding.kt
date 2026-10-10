@@ -50,7 +50,7 @@ object Onboarding {
             FormSection.INCOME -> p.copy(dualIncome = o.dualIncome, taxYears5 = o.taxYears5)
             FormSection.GAJEOM -> p.copy(birthDate = o.birthDate, homelessSince = o.homelessSince)
             FormSection.INTEREST -> p.copy(interestSido = o.interestSido)
-            FormSection.FUNDS -> p.copy(repayment = o.repayment)
+            FormSection.FUNDS -> p.copy(repayment = o.repayment, rateType = o.rateType, sellingHome = o.sellingHome)
             FormSection.NOTIFY -> p
         }
         return draft.copy(
@@ -68,7 +68,7 @@ object Onboarding {
         FormSection.INCOME -> listOf("householdSize", "incomePct", "realEstateManwon")
         FormSection.GAJEOM -> listOf("dependents")
         FormSection.INTEREST -> listOf("maxPriceManwon", "minAreaM2", "maxAreaM2")
-        FormSection.FUNDS -> listOf("cashManwon", "loanLimitManwon", "monthlyCapManwon", "loanRatePct", "loanYears", "downPaymentPct")
+        FormSection.FUNDS -> listOf("cashManwon", "loanLimitManwon", "monthlyCapManwon", "loanRatePct", "loanYears", "downPaymentPct", "incomeManwon", "debtAnnualManwon", "graceYears")
         FormSection.NOTIFY -> emptyList()
     }
 }

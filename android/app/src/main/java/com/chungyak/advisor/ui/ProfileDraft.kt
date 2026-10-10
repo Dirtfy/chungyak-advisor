@@ -42,8 +42,8 @@ enum class FormSection(val title: String, val help: String) {
     ),
     FUNDS(
         "자금(매매 가능 판정, 선택)",
-        "지금 쓸 수 있는 현금과 대출로 분양가를 낼 수 있는지 공고마다 보여 줍니다. 실제 쓸 대출 = 대출 한도와 " +
-            "월 상환액 상한으로 갚을 수 있는 원금 중 작은 쪽. 은행 대출 심사(LTV·DSR)가 아닌 입력값 기반 추정이에요.",
+        "지금 쓸 수 있는 현금과 대출로 분양가를 낼 수 있는지 공고마다 보여 줍니다. 대출 = LTV(담보 대비 비율)·DSR(소득 대비 " +
+            "원리금 비율)·주담대 금액 상한·입력한 한도 중 가장 작은 값. 공개된 규정으로 계산한 추정이라 실제 심사와 다를 수 있어요.",
     ),
     NOTIFY(
         "알림 범위",
@@ -89,6 +89,7 @@ data class ProfileDraft(
             loanRatePct = nums["loanRatePct"]?.toDoubleOrNull() ?: Profile.DEFAULT_LOAN_RATE,
             loanYears = n("loanYears", Profile.DEFAULT_LOAN_YEARS),
             downPaymentPct = n("downPaymentPct", Profile.DEFAULT_DOWN_PCT),
+            incomeManwon = n("incomeManwon"), debtAnnualManwon = n("debtAnnualManwon"), graceYears = n("graceYears", 0),
         )
     }
 
@@ -106,6 +107,7 @@ data class ProfileDraft(
             if (b.dependents > 20) add(FormProblem(FormSection.GAJEOM, "부양가족 수가 너무 큽니다."))
             if (b.loanRatePct > 30) add(FormProblem(FormSection.FUNDS, "대출 금리는 0~30% 사이로 넣어 주세요."))
             if (b.loanYears !in 1..50) add(FormProblem(FormSection.FUNDS, "상환 기간은 1~50년 사이로 넣어 주세요."))
+            if (b.graceYears >= b.loanYears && b.loanYears >= 1) add(FormProblem(FormSection.FUNDS, "거치기간은 상환 기간보다 짧아야 합니다."))
             if (b.downPaymentPct > 100) add(FormProblem(FormSection.FUNDS, "계약금 비율은 0~100% 사이로 넣어 주세요."))
         }
     }
@@ -115,6 +117,7 @@ data class ProfileDraft(
             "homesOwned", "children", "accountMonths", "payments", "depositManwon",
             "householdSize", "incomePct", "realEstateManwon", "maxPriceManwon", "minAreaM2", "maxAreaM2", "dependents",
             "cashManwon", "loanLimitManwon", "monthlyCapManwon", "loanRatePct", "loanYears", "downPaymentPct",
+            "incomeManwon", "debtAnnualManwon", "graceYears",
         )
 
         fun of(p: Profile, mode: NotifyMode): ProfileDraft {
@@ -128,6 +131,7 @@ data class ProfileDraft(
                 "dependents" to p.dependents,
                 "cashManwon" to p.cashManwon, "loanLimitManwon" to p.loanLimitManwon, "monthlyCapManwon" to p.monthlyCapManwon,
                 "loanYears" to p.loanYears, "downPaymentPct" to p.downPaymentPct,
+                "incomeManwon" to p.incomeManwon, "debtAnnualManwon" to p.debtAnnualManwon, "graceYears" to p.graceYears,
             )
             val rate = p.loanRatePct.toString().removeSuffix(".0")
             return ProfileDraft(p, values.mapValues { (_, v) -> if (v >= 0) v.toString() else "" } + ("loanRatePct" to rate), mode)

@@ -90,4 +90,16 @@ class ProfileDraftTest {
         assertEquals(listOf(FormSection.FUNDS), probs { it.withNum("downPaymentPct", "120") })
         assertTrue(probs { it.withNum("cashManwon", "30000") }.isEmpty())
     }
+
+    @Test fun loanRuleInputs() {
+        val d = ProfileDraft.of(Profile(sido = "서울"), NotifyMode.ALL)
+        assertEquals("", d.num("incomeManwon"))
+        assertEquals("0", d.num("graceYears"))
+        val b = d.withNum("incomeManwon", "8,000").withNum("debtAnnualManwon", "600").withNum("graceYears", "1").build()
+        assertEquals(8_000, b.incomeManwon)
+        assertEquals(600, b.debtAnnualManwon)
+        assertEquals(1, b.graceYears)
+        assertEquals(0, d.withNum("graceYears", "").build().graceYears)
+        assertEquals(listOf(FormSection.FUNDS), d.withNum("graceYears", "30").problems(today).map { it.section })
+    }
 }

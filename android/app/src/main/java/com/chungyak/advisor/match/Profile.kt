@@ -77,6 +77,12 @@ data class Profile(
     val loanYears: Int = DEFAULT_LOAN_YEARS,     // 가정: 상환 기간(년)
     val repayment: Repayment = Repayment.ANNUITY, // 가정: 상환 방식
     val downPaymentPct: Int = DEFAULT_DOWN_PCT,  // 가정: 계약금 비율(%) — 현금으로 내야 하는 몫
+    // 대출 규정 판정(v0.12.0~, LoanRules) — 주택 수·생애최초는 위 '세대' 항목을 쓴다.
+    val incomeManwon: Int = -1,         // 연소득(세전, 부부 공동이면 합산) — DSR·서민실수요자. -1 = 미입력 → DSR 미반영
+    val debtAnnualManwon: Int = -1,     // 기존 대출의 연간 원리금 상환액(DSR에 더함). -1 = 없음
+    val rateType: RateType = RateType.MIXED, // 가정: 금리 유형(스트레스 DSR 가산 비율)
+    val graceYears: Int = 0,            // 가정: 거치기간(년, 이자만 내는 기간)
+    val sellingHome: Boolean = false,   // 1주택: 기존 집을 6개월 안에 파는 조건(처분조건부) → 무주택과 같게
 ) {
     /** 프로필을 저장했는가(거주 시·도는 필수 항목). 아니면 매칭하지 않고 모든 공고를 알린다. */
     val isSet: Boolean get() = sido.isNotBlank()
