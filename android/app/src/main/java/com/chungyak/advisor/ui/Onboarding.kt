@@ -49,7 +49,7 @@ object Onboarding {
             FormSection.ACCOUNT -> p.copy(account = o.account, accountOpened = o.accountOpened)
             FormSection.INCOME -> p.copy(dualIncome = o.dualIncome, taxYears5 = o.taxYears5)
             FormSection.GAJEOM -> p.copy(birthDate = o.birthDate, homelessSince = o.homelessSince)
-            FormSection.INTEREST -> p.copy(interestSido = o.interestSido)
+            FormSection.INTEREST -> p.copy(interestRegions = o.interestRegions)
             FormSection.FUNDS -> p.copy(repayment = o.repayment, rateType = o.rateType, sellingHome = o.sellingHome)
             FormSection.NOTIFY -> p
         }

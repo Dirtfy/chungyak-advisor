@@ -74,6 +74,9 @@ object Eligibility {
         ).joinToString("·") + ")" else "비규제지역"
         if (models.isEmpty()) notes += "주택형 정보 대기 중 — 전용 85㎡ 이하·특공 물량 미확인으로 판정"
 
+        val region = Regions.match(p.interestRegions, n)
+        region.note?.let { notes += it }
+        if (!region.ok) return Result(Verdict.INELIGIBLE, emptyList(), "관심 지역(${Regions.summary(p.interestRegions)}) 아님", notes)
         filter(p, n, models)?.let { return Result(Verdict.INELIGIBLE, emptyList(), it, notes) }
 
         val sido = METRO.firstOrNull { n.areaName.contains(it) } ?: n.areaName
@@ -345,10 +348,8 @@ object Eligibility {
         return c.track("신생아 특공")
     }
 
-    /** 관심 조건(지역·분양가 상한·전용면적)으로 걸러지면 그 이유. 데이터가 없으면 거르지 않는다. */
+    /** 관심 조건(분양가 상한·전용면적)으로 걸러지면 그 이유. 데이터가 없으면 거르지 않는다. 지역은 [Regions.match]. */
     private fun filter(p: Profile, n: Notice, models: List<HouseModel>): String? {
-        if (p.interestSido.isNotEmpty() && p.interestSido.none { n.areaName.contains(it) })
-            return "관심 지역(${p.interestSido.joinToString("·")}) 아님"
         var ms = models
         if (known(p.minAreaM2) || known(p.maxAreaM2)) {
             val sized = ms.filter { it.exclusiveArea > 0 }

@@ -20,7 +20,7 @@ class ProfileStoreTest {
             everOwned = true, wonWithin5y = true, usedSpecial = true, married = true, marriageYm = "2022-03",
             children = 2, hasNewborn = true, supportsParent = true, account = AccountType.DEPOSIT, accountOpened = "2019-03-15",
             accountMonths = 30, payments = 30, depositManwon = 600, householdSize = 4, incomePct = 120,
-            dualIncome = true, realEstateManwon = 20_000, taxYears5 = true, interestSido = setOf("서울", "경기"),
+            dualIncome = true, realEstateManwon = 20_000, taxYears5 = true, interestRegions = setOf("서울", "경기 수원시", "경기 화성시"),
             maxPriceManwon = 120_000, minAreaM2 = 59, maxAreaM2 = 85,
             birthDate = "1990-02-03", homelessSince = "2020-05-06", dependents = 3,
             cashManwon = 30_000, loanLimitManwon = 50_000, monthlyCapManwon = 200, loanRatePct = 3.75, loanYears = 40,
@@ -41,7 +41,28 @@ class ProfileStoreTest {
         assertEquals(30, p.accountMonths)
         assertEquals("", p.accountOpened)
         assertEquals(30, p.accountMonthsAt(java.time.LocalDate.parse("2030-01-01"))) // 직접 입력값은 그대로
-        assertEquals(setOf("서울"), p.interestSido)
+        assertEquals(setOf("서울"), p.interestRegions)
+    }
+
+    /** v0.13.0 마이그레이션: v0.12.0 이하의 시·도 선택("경기")은 그대로 '경기 전체'(31개 시·군 모두)로 읽힌다. */
+    @Test fun v012Json_provinceInterest_becomesWholeProvince() {
+        val old = JSONObject("""{"sido":"경기","interestSido":["경기","인천"],"maxPriceManwon":90000}""")
+        val p = ProfileStore.decode(old)
+        assertEquals(setOf("경기", "인천"), p.interestRegions)
+        assertEquals(Regions.SIGUNGU.getValue("경기").toSet(), Regions.picked(p.interestRegions, "경기"))
+        assertEquals(90_000, p.maxPriceManwon)
+        // 다시 저장해도 같은 값, 옛 앱용 interestSido도 남는다.
+        val enc = ProfileStore.encode(p)
+        assertEquals(p, ProfileStore.decode(JSONObject(enc.toString())))
+        val legacy = enc.getJSONArray("interestSido")
+        assertEquals(setOf("경기", "인천"), (0 until legacy.length()).map { legacy.getString(it) }.toSet())
+    }
+
+    /** 시·군만 고른 값도 옛 앱용 interestSido에는 그 시·도로 남는다(내려 설치해도 공고가 빠지지 않게). */
+    @Test fun cityInterest_writesParentForOldApps() {
+        val enc = ProfileStore.encode(Profile(sido = "서울", interestRegions = setOf("경기 수원시")))
+        assertEquals("경기", enc.getJSONArray("interestSido").getString(0))
+        assertEquals(setOf("경기 수원시"), ProfileStore.decode(JSONObject(enc.toString())).interestRegions)
     }
 
     /** 실제 SharedPreferences 저장 → 새 인스턴스로 복원. */

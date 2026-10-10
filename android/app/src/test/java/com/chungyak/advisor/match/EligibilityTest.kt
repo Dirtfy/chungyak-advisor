@@ -173,7 +173,7 @@ class EligibilityTest {
     }
 
     @Test fun interestFilters() {
-        val p = seoulHead.copy(interestSido = setOf("경기"))
+        val p = seoulHead.copy(interestRegions = setOf("경기"))
         val r = Eligibility.evaluate(p, seoulNotice(), listOf(model()))
         assertEquals(Verdict.INELIGIBLE, r.verdict)
         assertNotNull(r.filteredOut)
@@ -181,6 +181,18 @@ class EligibilityTest {
         assertNotNull(Eligibility.evaluate(cheap, seoulNotice(), listOf(model(price = 150_000))).filteredOut)
         val small = seoulHead.copy(maxAreaM2 = 60)
         assertNotNull(Eligibility.evaluate(small, seoulNotice(), listOf(model(area = "084.9800A"))).filteredOut)
+    }
+
+    /** v0.13.0: 시·군 단위 관심 지역. 시·군을 못 읽은 공고는 포함하고 메모로 표시. */
+    @Test fun interestCity_filtersByAddress() {
+        val p = seoulHead.copy(interestRegions = setOf("경기 성남시"))
+        assertEquals(null, Eligibility.evaluate(p, gyeonggiNotice(), listOf(model())).filteredOut)
+        val suwon = gyeonggiNotice().copy(address = "경기도 수원시 권선구 서둔동")
+        assertNotNull(Eligibility.evaluate(p, suwon, listOf(model())).filteredOut)
+        val unknown = gyeonggiNotice().copy(address = "경기도 일원")
+        val r = Eligibility.evaluate(p, unknown, listOf(model()))
+        assertEquals(null, r.filteredOut)
+        assertTrue(r.notes.any { it.contains("시·군 미확인") })
     }
 
     @Test fun regulated_shortResidence_noted() {

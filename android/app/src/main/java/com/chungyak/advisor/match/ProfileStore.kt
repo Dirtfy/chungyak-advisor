@@ -52,6 +52,15 @@ class ProfileStore(context: Context) {
             if (p.residenceSince.isNotBlank() || p.residenceMonths < 0) p
             else p.copy(residenceSince = today.minusMonths(p.residenceMonths.toLong()).toString(), residenceMonths = -1)
 
+        /**
+         * 관심 지역(v0.13.0~ interestRegions). v0.12.0 이하는 시·도만 interestSido에 저장했다 → 그 값을 그대로 쓴다.
+         * "경기"는 [Regions]에서 '경기 전체 = 31개 시·군 모두'라 경기 공고가 하나도 빠지지 않는다.
+         */
+        fun migrateInterest(o: JSONObject): Set<String> {
+            val a = o.optJSONArray("interestRegions") ?: o.optJSONArray("interestSido") ?: return emptySet()
+            return Regions.normalize((0 until a.length()).map { a.getString(it) }.toSet())
+        }
+
         fun encode(p: Profile) = JSONObject()
             .put("sido", p.sido).put("residenceSince", p.residenceSince).put("sigungu", p.sigungu).put("residenceMonths", p.residenceMonths)
             .put("householdHead", p.householdHead).put("homesOwned", p.homesOwned)
@@ -63,7 +72,9 @@ class ProfileStore(context: Context) {
             .put("payments", p.payments).put("depositManwon", p.depositManwon)
             .put("householdSize", p.householdSize).put("incomePct", p.incomePct)
             .put("dualIncome", p.dualIncome).put("realEstateManwon", p.realEstateManwon)
-            .put("taxYears5", p.taxYears5).put("interestSido", JSONArray(p.interestSido.toList()))
+            .put("taxYears5", p.taxYears5).put("interestRegions", JSONArray(p.interestRegions.toList()))
+            // 옛 버전(v0.12.0 이하)으로 내려 설치해도 읽히게 시·도만 따로 남긴다(넓게: 일부만 골라도 그 시·도).
+            .put("interestSido", JSONArray(Regions.parents(p.interestRegions).toList()))
             .put("maxPriceManwon", p.maxPriceManwon).put("minAreaM2", p.minAreaM2).put("maxAreaM2", p.maxAreaM2)
             .put("birthDate", p.birthDate).put("homelessSince", p.homelessSince).put("dependents", p.dependents)
             .put("cashManwon", p.cashManwon).put("loanLimitManwon", p.loanLimitManwon).put("monthlyCapManwon", p.monthlyCapManwon)
@@ -84,7 +95,7 @@ class ProfileStore(context: Context) {
             depositManwon = o.optInt("depositManwon", -1), householdSize = o.optInt("householdSize", -1),
             incomePct = o.optInt("incomePct", -1), dualIncome = o.optBoolean("dualIncome"),
             realEstateManwon = o.optInt("realEstateManwon", -1), taxYears5 = o.optBoolean("taxYears5"),
-            interestSido = o.optJSONArray("interestSido")?.let { a -> (0 until a.length()).map { a.getString(it) }.toSet() } ?: emptySet(),
+            interestRegions = migrateInterest(o),
             maxPriceManwon = o.optInt("maxPriceManwon", -1), minAreaM2 = o.optInt("minAreaM2", -1),
             maxAreaM2 = o.optInt("maxAreaM2", -1),
             birthDate = o.optString("birthDate"), homelessSince = o.optString("homelessSince"),

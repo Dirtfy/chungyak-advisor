@@ -137,15 +137,7 @@ fun ProfileFields(section: FormSection, d: ProfileDraft, onChange: (ProfileDraft
         }
 
         FormSection.INTEREST -> {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("서울", "경기", "인천").forEach { s ->
-                    FilterChip(
-                        selected = s in p.interestSido,
-                        onClick = { edit { it.copy(interestSido = if (s in it.interestSido) it.interestSido - s else it.interestSido + s) } },
-                        label = { Text(s) },
-                    )
-                }
-            }
+            RegionPicker(p.interestRegions) { v -> edit { it.copy(interestRegions = v) } }
             num("maxPriceManwon", "분양가 상한(만원)")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) { num("minAreaM2", "전용 최소(㎡)") }

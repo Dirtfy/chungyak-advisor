@@ -13,3 +13,4 @@ android/build.log
 dist/
 __pycache__/
 build_*.log
+report_*.pdf

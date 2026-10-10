@@ -65,7 +65,7 @@ data class Profile(
     val homelessSince: String = "",     // 과거에 집이 있었다면 처분해 무주택이 된 날 "yyyy-MM-dd"
     val dependents: Int = -1,           // 부양가족 수(본인 제외). -1 = 미입력 → 배우자+자녀로 추정
     // 관심 필터(선택)
-    val interestSido: Set<String> = emptySet(), // 비어 있으면 전체
+    val interestRegions: Set<String> = emptySet(), // 비어 있으면 전체. "경기"(전체) 또는 "경기 수원시"(v0.13.0~) — [Regions]
     val maxPriceManwon: Int = -1,
     val minAreaM2: Int = -1,            // 전용면적
     val maxAreaM2: Int = -1,

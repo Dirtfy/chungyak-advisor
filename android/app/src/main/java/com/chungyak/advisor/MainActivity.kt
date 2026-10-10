@@ -97,6 +97,7 @@ import com.chungyak.advisor.match.AccountPeriod
 import com.chungyak.advisor.match.Affordability
 import com.chungyak.advisor.match.Eligibility
 import com.chungyak.advisor.match.Gajeom
+import com.chungyak.advisor.match.Regions
 import com.chungyak.advisor.ui.FormSection
 import com.chungyak.advisor.ui.FundsCard
 import com.chungyak.advisor.ui.FundsLine
@@ -439,7 +440,7 @@ internal fun NoticeRow(
         Column(Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Pill(n.areaName, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+                    Pill(Regions.label(n), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
                     if (n.speculationArea) Pill("투기과열", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
                     if (n.adjustmentArea) Pill("조정대상", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
                     if (recommend != null) Pill("추천 $recommend", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
@@ -700,7 +701,7 @@ internal fun DetailSummaryCard(n: Notice, today: String, cmpet: String) {
     ) {
         Column(Modifier.padding(18.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Pill(n.areaName, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+                Pill(Regions.label(n), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
                 ScheduleBadge.of(n, today)?.let { Pill(it.text, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary) }
             }
             Spacer(Modifier.height(10.dp))
