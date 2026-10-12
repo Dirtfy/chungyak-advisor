@@ -29,7 +29,13 @@ fun UpdateDialog(vm: UpdateViewModel = viewModel()) {
     // 앱이 화면에 나올 때마다 확인(최근 앱에서 복귀해도). 간격 제한은 ViewModel이 건다.
     val owner = LocalLifecycleOwner.current
     DisposableEffect(owner) {
-        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_START) vm.onForeground() }
+        val obs = LifecycleEventObserver { _, e ->
+            when (e) {
+                Lifecycle.Event.ON_START -> vm.onForeground()
+                Lifecycle.Event.ON_STOP -> vm.onBackground()
+                else -> {}
+            }
+        }
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
     }
@@ -63,11 +69,17 @@ fun UpdateDialog(vm: UpdateViewModel = viewModel()) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                             Text("다운로드 중…", style = MaterialTheme.typography.labelSmall)
                         }
+                        s.waiting?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "앱을 나가도 다운로드는 계속됩니다. 다 받으면 알림으로 알려 드립니다.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                     is UpdateState.Ready -> Text(
                         if (s.needsPermission)
                             "설치하려면 이 앱의 '알 수 없는 앱 설치'를 허용해야 합니다. [권한 설정]에서 허용한 뒤 돌아와 [설치]를 누르세요."
-                        else "설치 화면이 열리지 않았다면 [설치]를 다시 누르세요.",
+                        else "업데이트 파일을 다 받았습니다. [설치]를 누르세요.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     is UpdateState.Failed -> {
@@ -104,7 +116,8 @@ fun UpdateDialog(vm: UpdateViewModel = viewModel()) {
             }
         },
         dismissButton = {
-            if (s !is UpdateState.Downloading) TextButton(onClick = vm::later) { Text("나중에") }
+            if (s is UpdateState.Downloading) TextButton(onClick = vm::hideWhileDownloading) { Text("숨기기") }
+            else TextButton(onClick = vm::later) { Text("나중에") }
         },
     )
 }

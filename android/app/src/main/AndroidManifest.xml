@@ -42,6 +42,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- In-app update: DownloadManager finished the APK while the app was in the background → "ready" notification. -->
+        <receiver
+            android:name=".update.UpdateDownloadReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
         <!-- Shares the downloaded update APK with the package installer. -->
         <provider
             android:name="androidx.core.content.FileProvider"

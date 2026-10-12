@@ -1,7 +1,6 @@
 package com.chungyak.advisor.update
 
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -49,42 +48,6 @@ object UpdateClient {
         return null
     }
 
-    /** [url]을 [dest]로 받으며 진행률(0..1, 크기 모르면 -1)을 알린다. 실패 시 예외. */
-    fun download(url: String, expectedSize: Long, dest: File, onProgress: (Float) -> Unit) {
-        // cacheDir/updates는 새 설치 시 없다. v0.4.0~0.4.3은 이걸 만들지 않아 다운로드가 항상 ENOENT로 실패했다.
-        dest.parentFile?.mkdirs()
-        val tmp = File(dest.parentFile, dest.name + ".part")
-        val conn = open(url, 60_000)
-        try {
-            if (conn.responseCode !in 200..299) error("HTTP ${conn.responseCode}")
-            val total = conn.contentLengthLong.takeIf { it > 0 } ?: expectedSize
-            conn.inputStream.use { input ->
-                tmp.outputStream().use { out ->
-                    val buf = ByteArray(64 * 1024)
-                    var done = 0L
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        done += n
-                        onProgress(if (total > 0) (done.toFloat() / total).coerceAtMost(1f) else -1f)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            tmp.delete()
-            throw e
-        } finally {
-            conn.disconnect()
-        }
-        if (tmp.length() == 0L || (expectedSize > 0 && tmp.length() != expectedSize)) {
-            tmp.delete()
-            error("파일 크기가 맞지 않습니다")
-        }
-        dest.delete()
-        if (!tmp.renameTo(dest)) error("파일 저장 실패")
-    }
-
     private fun getJson(url: String): JSONObject? {
         val conn = open(url, 10_000)
         conn.setRequestProperty("Accept", "application/vnd.github+json")
@@ -96,7 +59,7 @@ object UpdateClient {
         }
     }
 
-    // 에셋 URL은 github.com → objects.githubusercontent.com 으로 리다이렉트(둘 다 https라 자동 추적).
+    // APK 다운로드는 UpdateDownloads(시스템 DownloadManager)가 한다 — 앱을 나가도 이어지게.
     private fun open(url: String, readTimeout: Int) =
         (URL(url).openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = true

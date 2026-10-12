@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 업데이트 APK(cacheDir/updates)만 시스템 설치 화면에 공유. -->
+<!-- 업데이트 APK만 시스템 설치 화면에 공유. v0.13.1~ DownloadManager가 앱 전용 외부 저장소(files/updates)에 받는다. -->
 <paths>
+    <external-files-path name="updates_ext" path="updates/" />
     <cache-path name="updates" path="updates/" />
 </paths>
