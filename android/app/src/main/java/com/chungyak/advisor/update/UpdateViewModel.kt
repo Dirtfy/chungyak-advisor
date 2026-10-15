@@ -59,8 +59,7 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
     /** 화면에 나올 때마다 호출(ON_START). 다운로드 상태를 이어 보여 주고, 간격 밖이면 새 버전을 확인한다. */
     fun onForeground() {
         sync()
-        val now = System.currentTimeMillis()
-        if (now - Session.lastCheck < AUTO_INTERVAL_MS) return
+        if (!autoCheckDue(System.currentTimeMillis(), Session.lastCheck)) return
         check(manual = false)
     }
 
@@ -102,11 +101,7 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
             val info = withContext(Dispatchers.IO) { runCatching { UpdateClient.latest() }.getOrNull() }
             checking = false
             val newer = info != null && Versions.isNewer(info.version, BuildConfig.VERSION_NAME)
-            if (newer && (manual || info!!.version != Session.dismissed) && !downloading()) {
-                // 이미 다 받아 둔 APK가 있으면 다시 받지 않고 바로 [설치]를 보여 준다.
-                _state.value = if (UpdateDownloads.isComplete(ctx, info!!)) UpdateState.Ready(info, !canInstall())
-                else UpdateState.Available(info)
-            }
+            if (newer) offer(info!!, manual)
             if (manual) _message.value = when {
                 info == null -> "업데이트 정보를 가져오지 못했습니다(네트워크 확인). 잠시 후 다시 시도하세요."
                 newer -> "새 버전 v${info.version}이 있습니다."
@@ -115,6 +110,16 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 새 버전 팝업을 띄운다. 자동 확인이면 [later]로 미룬 버전은 건너뛴다. */
+    internal fun offer(info: UpdateInfo, manual: Boolean) {
+        if (!manual && info.version == Session.dismissed) return
+        if (downloading()) return
+        // 이미 다 받아 둔 APK가 있으면 다시 받지 않고 바로 [설치]를 보여 준다.
+        _state.value = if (UpdateDownloads.isComplete(ctx, info)) UpdateState.Ready(info, !canInstall())
+        else UpdateState.Available(info)
+    }
+
+    /** [나중에] 버튼: 이 버전은 이 실행 동안 자동으로 다시 묻지 않는다(설정의 [업데이트 확인]은 예외). */
     fun later() {
         currentInfo()?.let { Session.dismissed = it.version }
         _state.value = UpdateState.Hidden
@@ -210,6 +215,10 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * 팝업 바깥 탭·뒤로 가기: 이번만 닫는다. 다음 확인(앱 복귀, 30분 간격) 때 같은 버전을 다시 띄운다.
+     * v0.13.1까지는 이것도 [later]로 처리해 실수로 바깥을 눌러도 그 버전을 다시 묻지 않았다.
+     */
     fun dismiss() {
         _state.value = UpdateState.Hidden
     }
@@ -223,7 +232,7 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 프로세스 수명 = 실행 세션. 화면 회전 등으로 다시 묻지 않게 여기 둔다. */
-    private object Session {
+    internal object Session {
         var lastCheck = 0L
         var dismissed: String? = null
     }
@@ -232,5 +241,8 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
         /** 자동 확인 최소 간격. GitHub 비인증 API 한도(60회/시간/IP)에 넉넉하다. */
         const val AUTO_INTERVAL_MS = 30 * 60 * 1000L
         const val POLL_MS = 500L
+
+        /** 앱이 화면에 나올 때(ON_START) 자동 확인할 때가 됐나. 최근 앱 복귀마다 확인하되 간격으로 중복 요청을 막는다. */
+        fun autoCheckDue(now: Long, lastCheck: Long) = now - lastCheck >= AUTO_INTERVAL_MS
     }
 }

@@ -51,8 +51,9 @@ fun UpdateDialog(vm: UpdateViewModel = viewModel()) {
     }
 
     AlertDialog(
+        // 바깥 탭·뒤로 가기 = 이번만 닫기(다음 확인 때 다시 뜸). 그 버전을 미루는 건 [나중에] 버튼만.
         // 다운로드 중엔 바깥 터치로 닫히지 않게.
-        onDismissRequest = { if (s !is UpdateState.Downloading) vm.later() },
+        onDismissRequest = { if (s !is UpdateState.Downloading) vm.dismiss() },
         title = { Text("새 버전 v${info.version}") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
