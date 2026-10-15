@@ -3,6 +3,7 @@ package com.chungyak.advisor.update
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -185,18 +186,45 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun canInstall() = ctx.packageManager.canRequestPackageInstalls()
 
-    /** 설치 화면 실행. 권한이 없으면 Ready(needsPermission)로 두고 설정 화면 안내. */
+    /**
+     * 설치 화면 실행 — 설치 화면을 여는 유일한 경로([설치] 버튼, 진행률 읽기의 완료, "업데이트 준비됨" 알림).
+     * 같은 파일로 방금 열었으면 건너뛴다. 넘기기 전에 파일을 검사해, 잘리거나 APK가 아니면 버리고
+     * [다시 시도]로 새로 받게 한다. 권한이 없으면 Ready(needsPermission)로 두고 설정 화면 안내.
+     */
     fun install(info: UpdateInfo) {
         UpdateDownloads.cancelNotification(ctx)
+        val path = UpdateDownloads.apkFile(ctx, info.version)?.path.orEmpty()
+        val now = SystemClock.elapsedRealtime()
+        if (!UpdateDownloads.shouldOpenInstaller(Session.installerPath, Session.installerAt, path, now)) return
+        val check = UpdateDownloads.verify(ctx, info)
+        if (check != UpdateDownloads.ApkCheck.OK) {
+            UpdateDownloads.discard(ctx)
+            _state.value = UpdateState.Failed(info, BROKEN_APK)
+            return
+        }
         if (!canInstall()) {
             _state.value = UpdateState.Ready(info, needsPermission = true)
             return
         }
+        Session.installerPath = path
+        Session.installerAt = now
         val started = runCatching { ctx.startActivity(UpdateDownloads.installIntent(ctx, info)) }
+        if (started.isFailure) Session.installerPath = null
         _state.value = started.fold(
             { UpdateState.Ready(info, needsPermission = false) },
             { UpdateState.Failed(info, "설치 화면을 열 수 없습니다: ${it.message}") },
         )
+    }
+
+    /** "업데이트 준비됨" 알림을 탭해 앱이 열렸을 때. 다 받은 상태면 설치 화면을 연다. */
+    fun installDownloaded() {
+        when (val d = UpdateDownloads.status(ctx)) {
+            is UpdateDownloads.Status.Done -> {
+                hiddenWhileDownloading = false
+                install(d.info)
+            }
+            else -> sync()
+        }
     }
 
     /** '알 수 없는 앱 설치' 허용 화면(이 앱 대상). 돌아와서 [설치]를 다시 누르면 된다. */
@@ -235,12 +263,16 @@ class UpdateViewModel(app: Application) : AndroidViewModel(app) {
     internal object Session {
         var lastCheck = 0L
         var dismissed: String? = null
+        /** 마지막으로 설치 화면을 연 APK와 그 시각(elapsedRealtime). 같은 파일로 겹쳐 열지 않게. */
+        var installerPath: String? = null
+        var installerAt = 0L
     }
 
     companion object {
         /** 자동 확인 최소 간격. GitHub 비인증 API 한도(60회/시간/IP)에 넉넉하다. */
         const val AUTO_INTERVAL_MS = 30 * 60 * 1000L
         const val POLL_MS = 500L
+        const val BROKEN_APK = "받은 업데이트 파일이 손상되어 설치할 수 없습니다. [다시 시도]를 누르면 새로 받습니다."
 
         /** 앱이 화면에 나올 때(ON_START) 자동 확인할 때가 됐나. 최근 앱 복귀마다 확인하되 간격으로 중복 요청을 막는다. */
         fun autoCheckDue(now: Long, lastCheck: Long) = now - lastCheck >= AUTO_INTERVAL_MS

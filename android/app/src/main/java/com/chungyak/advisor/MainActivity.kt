@@ -2,8 +2,10 @@ package com.chungyak.advisor
 
 import android.Manifest
 import android.os.Build
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -112,11 +114,17 @@ import com.chungyak.advisor.ui.PriceFormat
 import com.chungyak.advisor.ui.SortOrder
 import com.chungyak.advisor.ui.theme.ChungyakTheme
 import com.chungyak.advisor.update.UpdateDialog
+import com.chungyak.advisor.update.UpdateDownloads
+import com.chungyak.advisor.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
 
+    /** 화면의 UpdateDialog와 같은 인스턴스(이 Activity가 ViewModelStoreOwner). */
+    private val updates: UpdateViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) handleUpdateIntent(intent)
 
         val askNotif = registerForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -131,6 +139,19 @@ class MainActivity : ComponentActivity() {
                 UpdateDialog()
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleUpdateIntent(intent)
+    }
+
+    /** "업데이트 준비됨" 알림 탭. 최근 앱에서 다시 열 때 되돌아오는 첫 인텐트는 새 탭이 아니므로 무시. */
+    private fun handleUpdateIntent(intent: Intent?) {
+        if (intent?.action != UpdateDownloads.ACTION_INSTALL) return
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        updates.installDownloaded()
     }
 }
 

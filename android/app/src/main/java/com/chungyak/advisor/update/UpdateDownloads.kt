@@ -11,6 +11,8 @@ import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
+import androidx.core.content.pm.PackageInfoCompat
+import com.chungyak.advisor.BuildConfig
 import com.chungyak.advisor.MainActivity
 import com.chungyak.advisor.R
 import java.io.File
@@ -29,6 +31,8 @@ import java.io.File
 object UpdateDownloads {
 
     const val CHANNEL = "app_update"
+    /** "업데이트 준비됨" 알림 탭 → MainActivity → [UpdateViewModel.installDownloaded]. */
+    const val ACTION_INSTALL = "com.chungyak.advisor.action.INSTALL_UPDATE"
     private const val PREFS = "update_download"
     private const val NOTIF_ID = 0x5550
     private const val APK_MIME = "application/vnd.android.package-archive"
@@ -151,15 +155,18 @@ object UpdateDownloads {
     }
 
     /**
-     * "업데이트 준비됨" 알림. 탭하면 설치 화면(설치 권한이 아직 없으면 앱을 열어 권한 안내).
+     * "업데이트 준비됨" 알림. 탭하면 앱을 열고 앱이 설치 화면을 연다([ACTION_INSTALL]).
+     * v0.13.2까지는 알림이 설치 화면을 직접 열었다 — 앱 쪽 진행률 읽기도 설치 화면을 열 수 있어,
+     * 겹치면 같은 APK로 설치 화면이 두 번 뜨고 "앱 파일에 문제가 있습니다"로 실패할 수 있었다.
+     * 이제 설치 화면은 [UpdateViewModel.install] 한 곳에서만 연다(파일 검사 후, 같은 파일은 3초에 한 번).
      * 알림 권한이 없으면 조용히 건너뛴다 — 앱을 열면 팝업으로 설치를 안내한다.
      */
     fun notifyReady(ctx: Context, info: UpdateInfo) {
         val nm = NotificationManagerCompat.from(ctx)
         if (!nm.areNotificationsEnabled()) return
         ensureChannel(ctx)
-        val intent = if (ctx.packageManager.canRequestPackageInstalls()) installIntent(ctx, info)
-        else Intent(ctx, MainActivity::class.java)
+        val intent = Intent(ctx, MainActivity::class.java)
+            .setAction(ACTION_INSTALL)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val pi = PendingIntent.getActivity(
             ctx, NOTIF_ID, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -217,14 +224,67 @@ object UpdateDownloads {
         )
     }
 
-    /** 설치된 버전 이하의 기록·파일은 지운다(업데이트 설치 후 정리). */
-    fun cleanupIfInstalled(ctx: Context, installedVersion: String) {
-        val info = load(ctx) ?: return
-        if (Versions.isNewer(info.version, installedVersion)) return
+    /** 받은 APK를 설치 화면이 읽을 수 있나. */
+    enum class ApkCheck { OK, MISSING, INCOMPLETE, NOT_AN_APK, WRONG_APP, NOT_NEWER }
+
+    /**
+     * 받은 파일 검사(순수 함수, 단위테스트 대상). 설치 화면에 넘기기 전에 거른다 — 잘리거나 엉뚱한 파일을 넘기면
+     * 설치 화면이 "앱 파일에 문제가 있습니다"로 거부한다. [expectedSize] <= 0: 크기 모름, 비교 안 함.
+     * [archivePackage] null: APK로 읽히지 않음.
+     */
+    fun checkApk(
+        sizeOnDisk: Long,
+        expectedSize: Long,
+        archivePackage: String?,
+        archiveVersionCode: Long,
+        ourPackage: String,
+        installedVersionCode: Long,
+    ): ApkCheck = when {
+        sizeOnDisk <= 0 -> ApkCheck.MISSING
+        !sizeOk(sizeOnDisk, expectedSize) -> ApkCheck.INCOMPLETE
+        archivePackage == null -> ApkCheck.NOT_AN_APK
+        archivePackage != ourPackage -> ApkCheck.WRONG_APP
+        archiveVersionCode <= installedVersionCode -> ApkCheck.NOT_NEWER
+        else -> ApkCheck.OK
+    }
+
+    /** [info]의 받은 APK를 설치 화면이 읽는 방식(PackageManager)으로 읽어 검사한다. */
+    @Suppress("DEPRECATION") // int 플래그 오버로드는 지원 버전 전부에서 동작
+    fun verify(ctx: Context, info: UpdateInfo): ApkCheck {
+        val f = apkFile(ctx, info.version)?.takeIf(File::isFile) ?: return ApkCheck.MISSING
+        val pkg = runCatching { ctx.packageManager.getPackageArchiveInfo(f.path, 0) }.getOrNull()
+        return checkApk(
+            sizeOnDisk = f.length(),
+            expectedSize = info.apkSize,
+            archivePackage = pkg?.packageName,
+            archiveVersionCode = pkg?.let(PackageInfoCompat::getLongVersionCode) ?: -1L, // minSdk 26: longVersionCode는 28+
+            ourPackage = ctx.packageName,
+            installedVersionCode = BuildConfig.VERSION_CODE.toLong(),
+        )
+    }
+
+    /**
+     * 같은 파일로 설치 화면을 연 지 [INSTALLER_REPEAT_MS] 안이면 다시 열지 않는다(순수 함수).
+     * 설치 화면 두 개가 한 APK를 동시에 읽으면 파싱 오류로 실패한다.
+     */
+    fun shouldOpenInstaller(lastPath: String?, lastAt: Long, path: String, now: Long): Boolean =
+        path != lastPath || now - lastAt >= INSTALLER_REPEAT_MS
+
+    const val INSTALLER_REPEAT_MS = 3_000L
+
+    /** 받은 파일·기록을 버린다(검사 실패 시). 다음 [업데이트]/[다시 시도]는 처음부터 새로 받는다. */
+    fun discard(ctx: Context) {
         val dm = ctx.getSystemService(DownloadManager::class.java)
         prefs(ctx).getLong("id", -1L).takeIf { it >= 0 }?.let { runCatching { dm.remove(it) } }
         dir(ctx)?.listFiles()?.forEach { it.delete() }
         prefs(ctx).edit().clear().apply()
         cancelNotification(ctx)
+    }
+
+    /** 설치된 버전 이하의 기록·파일은 지운다(업데이트 설치 후 정리). */
+    fun cleanupIfInstalled(ctx: Context, installedVersion: String) {
+        val info = load(ctx) ?: return
+        if (Versions.isNewer(info.version, installedVersion)) return
+        discard(ctx)
     }
 }
